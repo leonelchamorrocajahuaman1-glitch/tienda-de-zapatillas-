@@ -1,0 +1,323 @@
+// Base de datos ÚNICA compartida por la tienda pública y el panel administrativo.
+// Los importes se guardan en céntimos (Int) para evitar errores de redondeo:
+// S/ 199.90 => 19990.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── Usuarios ───────────────────────────────
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role     @default(CUSTOMER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cart                Cart?
+  orders              Order[]
+  statusChanges       OrderStatusHistory[]
+  priceChanges        PriceHistory[]
+  inventoryMovements  InventoryMovement[]
+}
+
+// ─────────────────────────── Catálogo base ───────────────────────────
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Color {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  hex       String           @default("#000000")
+  createdAt DateTime         @default(now())
+  variants  ProductVariant[]
+  images    ProductImage[]
+}
+
+model Size {
+  id        String           @id @default(cuid())
+  label     String           @unique // p. ej. "40" o "40.5"
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  variants  ProductVariant[]
+}
+
+// ─────────────────────────────── Productos ───────────────────────────────
+
+enum ProductStatus {
+  DRAFT // borrador: solo visible en el panel
+  PUBLISHED // visible en la tienda
+  ARCHIVED // desactivado: oculto en la tienda, se conserva para el historial
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  name            String
+  slug            String        @unique
+  tagline         String? // frase cinematográfica, p. ej. "Born from the streets"
+  description     String        @default("")
+  brandId         String?
+  categoryId      String?
+  priceCents      Int
+  discountPercent Int           @default(0) // 0–90
+  status          ProductStatus @default(DRAFT)
+  featured        Boolean       @default(false) // aparece en las escenas 3D de la portada
+  accentColor     String        @default("#ff2a2a")
+  modelUrl        String? // ruta al .glb / .gltf subido
+  modelFileName   String?
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  brand        Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  category     Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images       ProductImage[]
+  variants     ProductVariant[]
+  priceHistory PriceHistory[]
+  orderItems   OrderItem[]
+
+  @@index([status])
+  @@index([brandId])
+  @@index([categoryId])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  colorId   String? // imagen asociada a un color concreto (opcional)
+  url       String
+  alt       String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color   Color?  @relation(fields: [colorId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+}
+
+// Inventario: una fila por combinación producto + talla + color.
+//   stock    = unidades físicas en almacén
+//   reserved = unidades apartadas por pedidos PENDIENTES (aún no confirmados)
+//   disponible para vender = stock - reserved
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  sizeId    String
+  colorId   String
+  sku       String?  @unique
+  stock     Int      @default(0)
+  reserved  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size       Size                @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  color      Color               @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  movements  InventoryMovement[]
+
+  @@unique([productId, sizeId, colorId])
+}
+
+model PriceHistory {
+  id              String   @id @default(cuid())
+  productId       String
+  priceCents      Int
+  discountPercent Int
+  changedById     String?
+  createdAt       DateTime @default(now())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+}
+
+enum MovementType {
+  ADJUSTMENT // ajuste manual desde el panel
+  RESERVE // pedido creado (pendiente)
+  RELEASE // pedido pendiente cancelado
+  COMMIT // pedido confirmado: sale del almacén
+  RESTOCK // pedido confirmado y luego cancelado: vuelve al almacén
+}
+
+// Registro auditable de cada cambio de inventario.
+model InventoryMovement {
+  id            String       @id @default(cuid())
+  variantId     String
+  type          MovementType
+  stockDelta    Int          @default(0)
+  reservedDelta Int          @default(0)
+  orderId       String?
+  note          String?
+  userId        String?
+  createdAt     DateTime     @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order   Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([variantId, createdAt])
+}
+
+// ─────────────────────────────── Carrito ───────────────────────────────
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  variantId String
+  quantity  Int
+  createdAt DateTime @default(now())
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+}
+
+// ─────────────────────────────── Pedidos ───────────────────────────────
+
+enum OrderStatus {
+  PENDING // Pendiente
+  CONFIRMED // Confirmado
+  PREPARING // Preparando
+  SHIPPED // Enviado
+  DELIVERED // Entregado
+  CANCELLED // Cancelado
+}
+
+// Estado del inventario asociado a un pedido. Impide descontar dos veces.
+enum InventoryState {
+  RESERVED // unidades apartadas (reserved += q)
+  COMMITTED // unidades descontadas del stock (stock -= q)
+  RELEASED // reserva liberada tras cancelar un pedido pendiente
+  RESTOCKED // unidades devueltas al stock tras cancelar un pedido confirmado
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY // pago contra entrega
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+model Order {
+  id             String         @id @default(cuid())
+  number         Int            @unique @default(autoincrement())
+  userId         String
+  status         OrderStatus    @default(PENDING)
+  inventoryState InventoryState @default(RESERVED)
+  idempotencyKey String?        @unique
+
+  subtotalCents Int // suma de precios de lista
+  discountCents Int // ahorro por descuentos
+  shippingCents Int
+  totalCents    Int
+
+  paymentMethod    PaymentMethod @default(CASH_ON_DELIVERY)
+  paymentStatus    PaymentStatus @default(PENDING)
+  paymentProvider  String? // reservado para la futura pasarela de pago
+  paymentReference String?
+
+  shippingName      String
+  shippingPhone     String
+  shippingAddress   String
+  shippingDistrict  String
+  shippingCity      String
+  shippingReference String?
+  notes             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  movements     InventoryMovement[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// Copia inmutable de lo que se vendió y a qué precio (precio histórico).
+model OrderItem {
+  id                  String  @id @default(cuid())
+  orderId             String
+  productId           String?
+  variantId           String?
+  productName         String
+  brandName           String?
+  sizeLabel           String
+  colorName           String
+  imageUrl            String?
+  unitListPriceCents  Int // precio de lista en el momento de la compra
+  discountPercent     Int
+  unitPriceCents      Int // precio final cobrado por unidad
+  quantity            Int
+  lineTotalCents      Int
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+}
+
+model OrderStatusHistory {
+  id          String       @id @default(cuid())
+  orderId     String
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  note        String?
+  changedById String?
+  createdAt   DateTime     @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User? @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+}

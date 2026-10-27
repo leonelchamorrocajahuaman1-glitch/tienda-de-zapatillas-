@@ -1,0 +1,32 @@
+{
+  "name": "tienda-zapatillas-3d",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Tienda de zapatillas 3D: tienda pública + panel administrativo + API compartida (Express + Prisma + PostgreSQL)",
+  "workspaces": [
+    "packages/*",
+    "server",
+    "apps/*"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "concurrently -k -n api,tienda,admin -c red,cyan,magenta \"npm:dev:server\" \"npm:dev:store\" \"npm:dev:admin\"",
+    "dev:server": "npm run dev -w server",
+    "dev:store": "npm run dev -w @tienda/store",
+    "dev:admin": "npm run dev -w @tienda/admin",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:deploy": "npm run db:deploy -w server",
+    "db:seed": "npm run db:seed -w server",
+    "db:studio": "npm run db:studio -w server",
+    "build": "npm run build -w server && npm run build -w @tienda/store && npm run build -w @tienda/admin",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w server"
+  },
+  "devDependencies": {
+    "concurrently": "9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
