@@ -97,6 +97,8 @@ console.log(bold("\nCreando la base de datos y aplicando migraciones…"));
 run("npx", ["prisma", "migrate", "deploy"], { cwd: path.join(root, "server") });
 console.log(bold("\nCargando datos iniciales…"));
 run("npx", ["prisma", "db", "seed"], { cwd: path.join(root, "server") });
+console.log(bold("\nImportando el catálogo (server/catalog/productos.json)…"));
+run("npx", ["tsx", "scripts/importar-catalogo.ts"], { cwd: path.join(root, "server") });
 
 console.log(green(bold("\n✔ Todo listo.\n")));
 console.log(`Inicia el sistema con:  ${bold("npm run dev")}   (o doble clic en iniciar.bat)\n`);

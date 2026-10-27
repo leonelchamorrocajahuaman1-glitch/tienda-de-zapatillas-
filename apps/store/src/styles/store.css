@@ -191,6 +191,14 @@ model-viewer {
   --progress-bar-color: var(--accent);
 }
 
+.visual--image img,
+.card__img {
+  /* Difumina los bordes: las fotos con fondo propio (oscuro, con luces) se
+     funden con el escenario y no se ve el rectángulo de la imagen. */
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 56%, transparent 71%);
+  mask-image: radial-gradient(ellipse at center, #000 56%, transparent 71%);
+}
+
 .visual--image img {
   width: 100%;
   height: 100%;
@@ -585,19 +593,31 @@ model-viewer {
   color: rgba(17, 17, 17, 0.06);
 }
 
+/* Sobre el fondo claro, la zapatilla se presenta en un "portal" oscuro */
 .finale__product {
   display: block;
-  width: min(80vw, 620px);
-  height: min(56vh, 520px);
+  width: min(78vw, 56vh, 540px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 58%, #1d1d21, #070708 68%);
+  box-shadow:
+    0 0 0 12px var(--paper),
+    0 0 0 13px rgba(17, 17, 17, 0.14),
+    0 50px 90px rgba(0, 0, 0, 0.35);
   transition: transform 0.5s var(--ease);
 }
 
 .finale__product:hover {
-  transform: scale(1.04) rotate(-2deg);
+  transform: scale(1.03);
+}
+
+.finale__product .visual--image {
+  padding: 9%;
 }
 
 .finale__product .visual--image img {
-  filter: drop-shadow(0 30px 30px rgba(0, 0, 0, 0.25));
+  filter: none;
 }
 
 .finale__cta {

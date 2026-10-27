@@ -91,7 +91,7 @@ export function ProductsPage() {
                   <td><ProductPill status={p.status} /></td>
                   <td className="muted">{[p.brand, p.category].filter(Boolean).join(" · ") || "—"}</td>
                   <td className="right num">
-                    {formatMoney(p.finalPriceCents)}
+                    {p.priceCents === 0 ? <span className="tag low">Sin precio</span> : formatMoney(p.finalPriceCents)}
                     {p.discountPercent > 0 && <div className="muted" style={{ fontSize: 11 }}>-{p.discountPercent}% de {formatMoney(p.priceCents)}</div>}
                   </td>
                   <td className={`right num ${p.stock - p.reserved <= 0 ? "zero" : ""}`}>

@@ -17,6 +17,7 @@
     "db:migrate": "npm run db:migrate -w server",
     "db:deploy": "npm run db:deploy -w server",
     "db:seed": "npm run db:seed -w server",
+    "catalogo:importar": "npm run catalog:import -w server",
     "db:studio": "npm run db:studio -w server",
     "build": "npm run build -w server && npm run build -w @tienda/store && npm run build -w @tienda/admin",
     "start": "npm run start -w server",

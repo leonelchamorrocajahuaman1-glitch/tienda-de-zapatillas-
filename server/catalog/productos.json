@@ -1,0 +1,240 @@
+{
+  "_instrucciones": [
+    "Catálogo para importar con:  npm run catalogo:importar",
+    "precio: en soles (ej. 549.90). Déjalo en null para importar el producto como BORRADOR y ponerle precio desde el panel.",
+    "stock: unidades por talla EU, ej. {\"40\": 3, \"41\": 5}. Las tallas deben existir (35 a 45 vienen creadas).",
+    "Un producto se PUBLICA automáticamente solo si tiene precio, stock e imágenes y \"publicar\" es true.",
+    "Volver a ejecutar el importador NO sobrescribe lo que cambies en el panel: solo crea lo que falta",
+    "(productos nuevos, precio si aún no tiene, inventario si aún no tiene, imágenes si aún no tiene)."
+  ],
+  "productos": [
+    {
+      "slug": "nike-air-max-270",
+      "nombre": "Air Max 270",
+      "marca": "Nike",
+      "categoria": "Urbanas",
+      "frase": "The future is air",
+      "descripcion": "Colorway: Negro / Azul. Limited Edition.",
+      "color": "Negro",
+      "acento": "#2f8cff",
+      "destacado": true,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "nike-air-max-270.webp",
+        "nike-air-max-270-poster.webp"
+      ]
+    },
+    {
+      "slug": "adidas-ultra-4d",
+      "nombre": "Ultra 4D",
+      "marca": "Adidas",
+      "categoria": "Running",
+      "frase": "Built for more",
+      "descripcion": "Colorway: Blanco / Negro. Premium Edition.",
+      "color": "Blanco",
+      "acento": "#cfd6de",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "adidas-ultra-4d.webp",
+        "adidas-ultra-4d-poster.webp"
+      ]
+    },
+    {
+      "slug": "air-jordan-1-high-og",
+      "nombre": "Air Jordan 1 High OG",
+      "marca": "Jordan",
+      "categoria": "Basketball",
+      "frase": "Legendary edition",
+      "descripcion": "Colorway: Negro / Rojo. Legendary Edition.",
+      "color": "Negro",
+      "acento": "#ff2a2a",
+      "destacado": true,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "air-jordan-1-high-og.webp",
+        "air-jordan-1-high-og-poster.webp"
+      ]
+    },
+    {
+      "slug": "puma-rs-x",
+      "nombre": "RS-X",
+      "marca": "Puma",
+      "categoria": "Urbanas",
+      "frase": "Bold. Futuristic.",
+      "descripcion": "Colorway: Negro / Morado. Limited Edition.",
+      "color": "Negro",
+      "acento": "#8a4dff",
+      "destacado": true,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "puma-rs-x.webp",
+        "puma-rs-x-poster.webp"
+      ]
+    },
+    {
+      "slug": "nike-zoomx-invincible",
+      "nombre": "ZoomX Invincible",
+      "marca": "Nike",
+      "categoria": "Running",
+      "frase": "Run without limits",
+      "descripcion": "Colorway: Blanco / Azul. Running Edition.",
+      "color": "Blanco",
+      "acento": "#3aa0ff",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "nike-zoomx-invincible.webp",
+        "nike-zoomx-invincible-poster.webp"
+      ]
+    },
+    {
+      "slug": "adidas-nmd-s1",
+      "nombre": "NMD S1",
+      "marca": "Adidas",
+      "categoria": "Urbanas",
+      "frase": "The next generation",
+      "descripcion": "Colorway: Negro / Naranja. Street Edition.",
+      "color": "Negro",
+      "acento": "#ff6a1a",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "adidas-nmd-s1.webp",
+        "adidas-nmd-s1-poster.webp"
+      ]
+    },
+    {
+      "slug": "air-jordan-4-retro",
+      "nombre": "Air Jordan 4 Retro",
+      "marca": "Jordan",
+      "categoria": "Basketball",
+      "frase": "Iconic edition",
+      "descripcion": "Colorway: Blanco / Azul. Iconic Edition.",
+      "color": "Blanco",
+      "acento": "#4d7dff",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "air-jordan-4-retro.webp",
+        "air-jordan-4-retro-poster.webp"
+      ]
+    },
+    {
+      "slug": "nike-vapormax",
+      "nombre": "VaporMax",
+      "marca": "Nike",
+      "categoria": "Urbanas",
+      "frase": "Next gen",
+      "descripcion": "Colorway: Negro / Verde. Air Edition.",
+      "color": "Negro",
+      "acento": "#39e639",
+      "destacado": true,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "nike-vapormax.webp",
+        "nike-vapormax-poster.webp"
+      ]
+    },
+    {
+      "slug": "adidas-yeezy-350-v2",
+      "nombre": "Yeezy 350 V2",
+      "marca": "Adidas",
+      "categoria": "Urbanas",
+      "frase": "Comfort meets style",
+      "descripcion": "Colorway: Beige / Gris. Original Edition.",
+      "color": "Beige",
+      "acento": "#c99b5f",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "adidas-yeezy-350-v2.webp",
+        "adidas-yeezy-350-v2-poster.webp"
+      ]
+    },
+    {
+      "slug": "nike-lebron-xx",
+      "nombre": "LeBron XX",
+      "marca": "Nike",
+      "categoria": "Basketball",
+      "frase": "More than a game",
+      "descripcion": "Colorway: Negro / Morado. Signature Edition.",
+      "color": "Negro",
+      "acento": "#b44dff",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "nike-lebron-xx.webp",
+        "nike-lebron-xx-poster.webp"
+      ]
+    },
+    {
+      "slug": "puma-future-rider",
+      "nombre": "Future Rider",
+      "marca": "Puma",
+      "categoria": "Running",
+      "frase": "Shape the future",
+      "descripcion": "Colorway: Blanco / Naranja. Running Edition.",
+      "color": "Blanco",
+      "acento": "#ff7a1a",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "puma-future-rider.webp",
+        "puma-future-rider-poster.webp"
+      ]
+    },
+    {
+      "slug": "adidas-ozweego",
+      "nombre": "Ozweego",
+      "marca": "Adidas",
+      "categoria": "Urbanas",
+      "frase": "Adapt to change",
+      "descripcion": "Colorway: Negro / Iridiscente. Lifestyle Edition.",
+      "color": "Negro",
+      "acento": "#5a6bff",
+      "destacado": false,
+      "publicar": true,
+      "precio": null,
+      "descuento": 0,
+      "stock": {},
+      "imagenes": [
+        "adidas-ozweego.webp",
+        "adidas-ozweego-poster.webp"
+      ]
+    }
+  ]
+}

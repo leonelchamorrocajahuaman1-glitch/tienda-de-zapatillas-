@@ -49,6 +49,7 @@ El asistente:
 3. Instala las dependencias (`npm install`).
 4. **Crea la base de datos y aplica las migraciones** (`prisma migrate deploy`).
 5. **Carga los datos iniciales** (`prisma db seed`): el administrador, las tallas EU 35–45, los colores, las categorías y las marcas base. **No crea productos ni pedidos falsos.**
+6. **Importa tu catálogo** (`server/catalog/productos.json`): los 12 modelos con sus fotos (ver la sección "Catálogo de modelos").
 
 <details>
 <summary>Instalación manual, paso a paso</summary>
@@ -83,6 +84,21 @@ Esto levanta tres procesos a la vez:
 Para detener todo: `Ctrl + C` en la terminal.
 
 También puedes iniciarlos por separado: `npm run dev:server`, `npm run dev:store` y `npm run dev:admin`.
+
+## Catálogo de modelos
+
+`server/catalog/productos.json` contiene 12 modelos: Air Max 270, Ultra 4D, Air Jordan 1 High OG, RS-X, ZoomX Invincible, NMD S1, Air Jordan 4 Retro, VaporMax, Yeezy 350 V2, LeBron XX, Future Rider y Ozweego. Cada uno tiene su marca, categoría, frase, colorway, color de luz para la escena 3D y dos fotos (en `server/catalog/imagenes/`).
+
+```bash
+npm run catalogo:importar
+```
+
+- Los modelos **no traen precio ni stock**, así que se importan como **borradores** (no se ven en la tienda). Para publicarlos:
+  - **Desde el panel:** Productos → abre el modelo → escribe el precio → elige tallas y existencias → **Publicar en la tienda**.
+  - **O en bloque:** completa `"precio"` (en soles) y `"stock"` (p. ej. `{"40": 3, "41": 5}`) en `productos.json` y vuelve a ejecutar `npm run catalogo:importar`. Los modelos completos se publican solos.
+- El importador **no sobrescribe** lo que cambies en el panel: solo crea lo que falta. Se puede ejecutar varias veces sin problema.
+- Air Max 270, Air Jordan 1, RS-X y VaporMax vienen marcados como **destacados** (escenas de la portada). Cámbialo con la casilla "Destacar en la portada".
+- Para añadir más modelos: agrega entradas al JSON y sus fotos a `server/catalog/imagenes/`, o créalos desde el panel.
 
 ## 4. Entrar al panel administrativo
 
@@ -180,6 +196,7 @@ Lista de comprobación:
 | `npm run db:deploy` | Aplica las migraciones |
 | `npm run db:migrate` | Crea una migración nueva tras editar `schema.prisma` (desarrollo) |
 | `npm run db:seed` | Datos iniciales (se puede repetir sin duplicar) |
+| `npm run catalogo:importar` | Importa/completa el catálogo de `server/catalog/productos.json` |
 | `npm run db:studio` | Explorador visual de la base de datos |
 | `npm run typecheck` | Comprobación de tipos de todo el proyecto |
 | `npm test` | Pruebas de extremo a extremo de la API (requiere `TEST_DATABASE_URL`) |
@@ -204,6 +221,8 @@ packages/
   shared/    Tipos, formato en soles y cliente HTTP compartidos
 server/
   prisma/    schema.prisma (base de datos única), migraciones y datos iniciales
+  catalog/   productos.json + imagenes/ (catálogo importable)
+  scripts/   importar-catalogo.ts
   src/
     routes/public/   catálogo, autenticación de clientes, carrito y pedidos
     routes/admin/    API privada del panel

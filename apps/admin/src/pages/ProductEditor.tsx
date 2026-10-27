@@ -111,7 +111,7 @@ export function ProductEditorPage() {
       description: p.description,
       brandId: p.brandId ?? "",
       categoryId: p.categoryId ?? "",
-      price: soles(p.priceCents),
+      price: p.priceCents > 0 ? soles(p.priceCents) : "",
       discountPercent: String(p.discountPercent),
       featured: p.featured,
       accentColor: p.accentColor,
