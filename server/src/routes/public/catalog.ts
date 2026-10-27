@@ -5,6 +5,8 @@ import { prisma } from "../../db";
 import { notFound } from "../../lib/errors";
 import { finalPrice } from "../../lib/pricing";
 import { parse } from "../../lib/validate";
+import { config } from "../../config";
+import { availablePaymentMethods } from "../../payments";
 
 /** Catálogo público: SOLO productos publicados. Datos leídos en cada consulta. */
 export const catalogRouter = Router();
@@ -139,6 +141,15 @@ catalogRouter.get("/featured", async (_req, res) => {
     take: 8,
   });
   res.json({ featured: products.map(toSummary), latest: latest.map(toSummary) });
+});
+
+/** Parámetros públicos de la tienda (envío y métodos de pago). */
+catalogRouter.get("/settings", (_req, res) => {
+  res.json({
+    shippingFlatCents: config.shippingFlatCents,
+    freeShippingMinCents: config.freeShippingMinCents,
+    paymentMethods: availablePaymentMethods,
+  });
 });
 
 catalogRouter.get("/filters", async (_req, res) => {
