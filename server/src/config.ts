@@ -44,7 +44,6 @@ export const config = {
     .filter(Boolean),
   shippingFlatCents: int("SHIPPING_FLAT_CENTS", 1000),
   freeShippingMinCents: int("FREE_SHIPPING_MIN_CENTS", 30000),
-  uploadsDir: process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR) : path.resolve(__dirname, "../uploads"),
   // Carpetas de las apps compiladas (se sirven en producción desde la misma API)
   storeDist: path.resolve(__dirname, "../../apps/store/dist"),
   adminDist: path.resolve(__dirname, "../../apps/admin/dist"),

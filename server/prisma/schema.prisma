@@ -321,3 +321,17 @@ model OrderStatusHistory {
 
   @@index([orderId, createdAt])
 }
+
+// ─────────────────────────── Archivos subidos ───────────────────────────
+// Imágenes y modelos 3D se guardan en la propia base de datos: así funcionan
+// igual en tu PC y en un hosting sin disco permanente, y una copia de
+// seguridad de la base incluye también los archivos.
+model StoredFile {
+  id        String   @id @default(cuid())
+  kind      String // "image" | "model"
+  mimeType  String
+  fileName  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+}

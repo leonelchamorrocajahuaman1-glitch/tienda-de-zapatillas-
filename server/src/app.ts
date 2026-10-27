@@ -6,6 +6,7 @@ import express from "express";
 import helmet from "helmet";
 import { config } from "./config";
 import { errorHandler, notFoundHandler } from "./middleware/error";
+import { serveUpload } from "./storage/uploads";
 import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/public/auth";
 import { cartRouter } from "./routes/public/cart";
@@ -44,18 +45,8 @@ export function createApp() {
   app.use(express.json({ limit: "200kb" }));
   app.use(cookieParser());
 
-  // Archivos subidos (imágenes y modelos 3D)
-  app.use(
-    "/uploads",
-    express.static(config.uploadsDir, {
-      maxAge: "7d",
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith(".glb")) res.setHeader("Content-Type", "model/gltf-binary");
-        if (filePath.endsWith(".gltf")) res.setHeader("Content-Type", "model/gltf+json");
-        res.setHeader("X-Content-Type-Options", "nosniff");
-      },
-    }),
-  );
+  // Archivos subidos (imágenes y modelos 3D), guardados en la base de datos
+  app.get("/uploads/:file", serveUpload);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });

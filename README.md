@@ -166,26 +166,43 @@ Para ver directamente las tablas: `npm run db:studio` (abre Prisma Studio en el 
 - **Envío:** `SHIPPING_FLAT_CENTS` y `FREE_SHIPPING_MIN_CENTS` en `server/.env` (en céntimos: `1000` = S/ 10.00).
 - **Color de luz de cada escena:** campo "Color de luz en la escena 3D" de cada producto.
 
-## 10. Publicarlo en Internet (más adelante)
+## 10. Publicarla en Internet (link público)
 
-Que funcione en `localhost` **no significa que esté publicado**: hay que desplegarlo en un servidor. La arquitectura ya lo permite:
+El repositorio ya trae `render.yaml`, así que se publica en [Render](https://render.com) en unos minutos y sin tocar código.
 
-```bash
-npm run build          # compila la API, la tienda y el panel
-npm run db:deploy      # aplica las migraciones en la base de datos de producción
-npm start              # con NODE_ENV=production en server/.env
-```
+### Pasos
 
-En producción, **una sola instancia de Node** sirve la tienda en `/`, el panel en `/admin` y la API en `/api` (puerto `PORT`).
+1. Crea una cuenta en https://render.com con **"Sign up with GitHub"** y autoriza el acceso a este repositorio.
+2. Abre este enlace:
+   **https://render.com/deploy?repo=https://github.com/leonelchamorrocajahuaman1-glitch/tienda-de-zapatillas-**
+   (o, en el panel de Render: **New → Blueprint** → elige el repositorio).
+3. Render te pedirá dos datos:
+   - `ADMIN_EMAIL`: el email con el que entrarás al panel.
+   - `ADMIN_PASSWORD`: tu contraseña de administrador (**mínimo 10 caracteres**).
+4. Pulsa **Apply / Deploy Blueprint** y espera unos 5–10 minutos. Render crea la base de datos PostgreSQL, compila todo, aplica las migraciones, crea el administrador e importa los 12 modelos.
+5. Tu tienda queda en una dirección como **https://sole20-tienda.onrender.com** (Render muestra la URL exacta):
+   - Tienda: `https://sole20-tienda.onrender.com`
+   - Panel: `https://sole20-tienda.onrender.com/admin`
+6. Entra al panel, ponles precio y stock a los modelos y pulsa **Publicar en la tienda**.
 
-Lista de comprobación:
-- **HTTPS obligatorio.** Con `NODE_ENV=production` las cookies son `Secure`. Usa un proxy con certificado (Nginx o Caddy) o una plataforma que lo incluya (Render, Railway, Fly.io o un VPS).
-- **PostgreSQL gestionado** (Neon, Supabase, RDS o el de tu proveedor): pon su URL en `DATABASE_URL`.
-- **Secretos nuevos y largos** en `JWT_SECRET_STORE` y `JWT_SECRET_ADMIN`.
-- **Archivos subidos:** `server/uploads` debe estar en un disco persistente. Otra opción es reemplazar `server/src/storage/uploads.ts` por S3, R2 o Cloudinary.
-- **El panel sigue siendo privado:** exige la sesión de administrador. Si quieres una capa extra, restringe `/admin` y `/api/admin` por IP o VPN en el proxy.
-- Si la tienda y la API van en dominios distintos, configura `CORS_ORIGINS`.
-- Para probar la versión compilada en tu PC sin HTTPS: `COOKIE_SECURE=false` en `server/.env` y abre http://localhost:4000.
+Cada vez que se suban cambios a GitHub, Render vuelve a publicar la tienda automáticamente.
+
+### Plan gratuito y plan de pago
+
+La configuración usa los **planes gratuitos** de Render, que sirven para probar la tienda. Según la documentación de Render:
+- El servicio web gratuito **se duerme** tras 15 minutos sin visitas, y la siguiente visita tarda alrededor de un minuto en cargar.
+- La base de datos gratuita **caduca a los 30 días**. Después hay 14 días de gracia y luego se borra con todos sus datos.
+
+Para vender de verdad, cambia en Render el servicio y la base de datos a un plan de pago (o cambia `plan:` en `render.yaml`) **antes de que pasen los 30 días**. Consulta los precios actuales en https://render.com/pricing.
+
+### Detalles técnicos
+
+- Un solo servicio de Node sirve la tienda en `/`, el panel en `/admin` y la API en `/api`.
+- Las imágenes y los modelos 3D se guardan **en la base de datos** (tabla `StoredFile`), así que no hace falta un disco permanente y una copia de la base incluye también los archivos.
+- Al arrancar (`npm run start:prod`) se aplican las migraciones, se crea el administrador si falta y se importa el catálogo **solo si la base está vacía**. Así no reaparece un producto que hayas borrado.
+- Los secretos de sesión los genera Render. HTTPS viene incluido, así que las cookies son `Secure`.
+- Para usar tu propio dominio (p. ej. `www.sole20.pe`): en Render, **Settings → Custom Domains**.
+- En otro proveedor (Railway, un VPS…): `npm ci --include=dev && npm run build` y luego `npm run start:prod`, con las variables de `server/.env.example`. Para probarlo en tu PC sin HTTPS, usa `COOKIE_SECURE=false`.
 
 ## 11. Comandos
 
@@ -200,7 +217,7 @@ Lista de comprobación:
 | `npm run db:studio` | Explorador visual de la base de datos |
 | `npm run typecheck` | Comprobación de tipos de todo el proyecto |
 | `npm test` | Pruebas de extremo a extremo de la API (requiere `TEST_DATABASE_URL`) |
-| `npm run build` / `npm start` | Compilar y ejecutar en modo producción |
+| `npm run build` / `npm run start:prod` | Compilar y ejecutar en modo producción (migra, crea el admin e importa el catálogo si la base está vacía) |
 
 **Pruebas automáticas:** crea una base de datos vacía cuyo nombre termine en `_test` y ejecuta:
 

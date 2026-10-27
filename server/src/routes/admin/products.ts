@@ -7,14 +7,7 @@ import { finalPrice } from "../../lib/pricing";
 import { slugify } from "../../lib/slug";
 import { parse } from "../../lib/validate";
 import { setStock } from "../../services/inventory";
-import {
-  assertValidImage,
-  assertValidModel,
-  imageUpload,
-  modelUpload,
-  publicUrl,
-  removeByUrl,
-} from "../../storage/uploads";
+import { imageMime, imageUpload, modelMime, modelUpload, removeByUrl, saveFile } from "../../storage/uploads";
 
 export const adminProductsRouter = Router();
 
@@ -226,8 +219,7 @@ adminProductsRouter.delete("/:id", async (req, res) => {
     );
   }
   await prisma.product.delete({ where: { id: product.id } });
-  product.images.forEach((i) => removeByUrl(i.url));
-  removeByUrl(product.modelUrl);
+  await Promise.all([...product.images.map((i) => removeByUrl(i.url)), removeByUrl(product.modelUrl)]);
   res.json({ ok: true });
 });
 
@@ -313,23 +305,22 @@ adminProductsRouter.put("/:id/variants", async (req, res) => {
 adminProductsRouter.post("/:id/images", imageUpload.array("images", 10), async (req, res) => {
   const files = (req.files as Express.Multer.File[] | undefined) ?? [];
   const product = await prisma.product.findUnique({ where: { id: String(req.params.id) }, include: { images: true } });
-  if (!product) {
-    files.forEach((f) => removeByUrl(publicUrl("images", f.filename)));
-    throw notFound("Producto no encontrado");
-  }
+  if (!product) throw notFound("Producto no encontrado");
   if (files.length === 0) throw badRequest("Selecciona al menos una imagen");
   const colorId = typeof req.body.colorId === "string" && req.body.colorId ? req.body.colorId : null;
-  for (const f of files) assertValidImage(f.path);
+  const mimes = files.map((f) => imageMime(f.buffer)); // valida todas antes de guardar
   let order = product.images.reduce((m, i) => Math.max(m, i.sortOrder), -1);
-  await prisma.productImage.createMany({
-    data: files.map((f) => ({
-      productId: product.id,
-      url: publicUrl("images", f.filename),
-      alt: product.name,
-      colorId,
-      sortOrder: ++order,
-    })),
-  });
+  for (const [i, f] of files.entries()) {
+    await prisma.productImage.create({
+      data: {
+        productId: product.id,
+        url: await saveFile("image", f.buffer, mimes[i], f.originalname),
+        alt: product.name,
+        colorId,
+        sortOrder: ++order,
+      },
+    });
+  }
   res.status(201).json(await loadDetail(product.id));
 });
 
@@ -362,7 +353,7 @@ adminProductsRouter.delete("/:id/images/:imageId", async (req, res) => {
   await prisma.productImage.delete({ where: { id: image.id } });
   // Las imágenes usadas en pedidos se conservan en disco para el historial.
   const usedInOrders = await prisma.orderItem.count({ where: { imageUrl: image.url } });
-  if (!usedInOrders) removeByUrl(image.url);
+  if (!usedInOrders) await removeByUrl(image.url);
   res.json(await loadDetail(req.params.id));
 });
 
@@ -372,16 +363,16 @@ adminProductsRouter.post("/:id/model", modelUpload.single("model"), async (req, 
   const file = req.file;
   if (!file) throw badRequest("Selecciona un archivo .glb o .gltf");
   const product = await prisma.product.findUnique({ where: { id: String(req.params.id) } });
-  if (!product) {
-    removeByUrl(publicUrl("models", file.filename));
-    throw notFound("Producto no encontrado");
-  }
-  assertValidModel(file.path);
+  if (!product) throw notFound("Producto no encontrado");
+  const mime = modelMime(file.buffer, file.originalname);
   await prisma.product.update({
     where: { id: product.id },
-    data: { modelUrl: publicUrl("models", file.filename), modelFileName: file.originalname.slice(0, 200) },
+    data: {
+      modelUrl: await saveFile("model", file.buffer, mime, file.originalname),
+      modelFileName: file.originalname.slice(0, 200),
+    },
   });
-  removeByUrl(product.modelUrl);
+  await removeByUrl(product.modelUrl);
   res.status(201).json(await loadDetail(product.id));
 });
 
@@ -389,6 +380,6 @@ adminProductsRouter.delete("/:id/model", async (req, res) => {
   const product = await prisma.product.findUnique({ where: { id: req.params.id } });
   if (!product) throw notFound("Producto no encontrado");
   await prisma.product.update({ where: { id: product.id }, data: { modelUrl: null, modelFileName: null } });
-  removeByUrl(product.modelUrl);
+  await removeByUrl(product.modelUrl);
   res.json(await loadDetail(product.id));
 });

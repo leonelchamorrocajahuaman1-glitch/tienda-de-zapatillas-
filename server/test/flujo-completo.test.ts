@@ -5,7 +5,6 @@
  *   TEST_DATABASE_URL=postgresql://.../tienda_zapatillas_test npm test
  */
 import { execSync } from "node:child_process";
-import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
@@ -43,7 +42,6 @@ function minimalGlb(): Buffer {
 run("Flujo completo tienda + panel sobre la misma base de datos", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = TEST_DB!;
-    process.env.UPLOADS_DIR = path.join(os.tmpdir(), `tienda-test-uploads-${process.pid}`);
     process.env.JWT_SECRET_STORE ??= "test-store-secret-0123456789abcdef";
     process.env.JWT_SECRET_ADMIN ??= "test-admin-secret-fedcba9876543210";
     const env = { ...process.env, DATABASE_URL: TEST_DB! };
@@ -144,7 +142,10 @@ run("Flujo completo tienda + panel sobre la misma base de datos", () => {
       .post(`/api/admin/products/${productId}/model`)
       .attach("model", minimalGlb(), { filename: "urban-x.glb", contentType: "model/gltf-binary" });
     expect(model.status).toBe(201);
-    expect(model.body.modelUrl).toMatch(/^\/uploads\/models\/.+\.glb$/);
+    expect(model.body.modelUrl).toMatch(/^\/uploads\/[a-z0-9]+\.glb$/);
+    const served = await request(app).get(model.body.modelUrl);
+    expect(served.status).toBe(200);
+    expect(served.headers["content-type"]).toBe("model/gltf-binary");
   });
 
   it("6-7. lo publica y aparece en el catálogo de la tienda", async () => {

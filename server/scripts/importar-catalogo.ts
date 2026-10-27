@@ -10,13 +10,12 @@
  * - Es seguro ejecutarlo varias veces: nunca sobrescribe lo que se haya editado
  *   en el panel; solo completa lo que falta.
  */
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { config } from "../src/config";
 import { prisma } from "../src/db";
 import { slugify } from "../src/lib/slug";
+import { imageMime, saveFile } from "../src/storage/uploads";
 
 const CATALOG_DIR = path.resolve(__dirname, "../catalog");
 const IMAGES_DIR = path.join(CATALOG_DIR, "imagenes");
@@ -73,19 +72,25 @@ async function findOrCreateColor(name: string) {
   );
 }
 
-function copyImage(fileName: string): string {
+async function storeImage(fileName: string): Promise<string> {
   const source = path.join(IMAGES_DIR, fileName);
   if (!fs.existsSync(source)) throw new Error(`No existe la imagen ${source}`);
-  const dir = path.join(config.uploadsDir, "images");
-  fs.mkdirSync(dir, { recursive: true });
-  const name = `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${path.extname(fileName).toLowerCase()}`;
-  fs.copyFileSync(source, path.join(dir, name));
-  return `/uploads/images/${name}`;
+  const data = fs.readFileSync(source);
+  return saveFile("image", data, imageMime(data), fileName);
 }
 
 async function main() {
-  // Se puede indicar otro archivo: npm run catalogo:importar -- ruta/al/archivo.json
-  const catalogFile = process.argv[2] ? path.resolve(process.argv[2]) : path.join(CATALOG_DIR, "productos.json");
+  // Opciones:
+  //   npm run catalogo:importar -- ruta/al/archivo.json   (otro archivo)
+  //   npm run catalogo:importar -- --solo-si-vacio        (solo si la tienda no tiene productos;
+  //                                                        lo usa el arranque en el hosting)
+  const args = process.argv.slice(2);
+  if (args.includes("--solo-si-vacio") && (await prisma.product.count()) > 0) {
+    console.log("Catálogo: la base ya tiene productos, no se importa nada.");
+    return;
+  }
+  const fileArg = args.find((a) => !a.startsWith("--"));
+  const catalogFile = fileArg ? path.resolve(fileArg) : path.join(CATALOG_DIR, "productos.json");
   const raw = JSON.parse(fs.readFileSync(catalogFile, "utf8"));
   const parsed = file.safeParse(raw);
   if (!parsed.success) {
@@ -142,7 +147,7 @@ async function main() {
     if (imageCount === 0 && p.imagenes.length) {
       for (const [i, img] of p.imagenes.entries()) {
         await prisma.productImage.create({
-          data: { productId: product.id, url: copyImage(img), alt: product.name, sortOrder: i },
+          data: { productId: product.id, url: await storeImage(img), alt: product.name, sortOrder: i },
         });
       }
       notes.push(`${p.imagenes.length} imágenes`);

@@ -1,0 +1,48 @@
+# Despliegue en Render (https://render.com) como "Blueprint":
+#   Render → New → Blueprint → elige este repositorio → Apply
+# Crea la tienda web (tienda + panel + API en un solo servicio) y su base de
+# datos PostgreSQL. Te pedirá ADMIN_EMAIL y ADMIN_PASSWORD (mín. 10 caracteres).
+services:
+  - type: web
+    name: sole20-tienda
+    runtime: node
+    plan: free # cámbialo a "starter" para que no se duerma (de pago)
+    region: virginia
+    buildCommand: npm ci --include=dev && npm run build
+    # Aplica migraciones, crea el administrador, importa el catálogo si la
+    # base está vacía y arranca el servidor.
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sole20-db
+          property: connectionString
+      - key: JWT_SECRET_STORE
+        generateValue: true
+      - key: JWT_SECRET_ADMIN
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NAME
+        value: Administrador
+      - key: VITE_STORE_NAME
+        value: SOLE 20
+      - key: SHIPPING_FLAT_CENTS
+        value: "1000"
+      - key: FREE_SHIPPING_MIN_CENTS
+        value: "30000"
+
+databases:
+  - name: sole20-db
+    plan: free # la base gratuita de Render caduca a los 30 días: pásala a un plan de pago para vender de verdad
+    region: virginia
+    databaseName: tienda_zapatillas
+    user: tienda

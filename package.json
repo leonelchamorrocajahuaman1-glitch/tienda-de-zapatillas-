@@ -21,6 +21,7 @@
     "db:studio": "npm run db:studio -w server",
     "build": "npm run build -w server && npm run build -w @tienda/store && npm run build -w @tienda/admin",
     "start": "npm run start -w server",
+    "start:prod": "npm run start:prod -w server",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test -w server"
   },
