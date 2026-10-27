@@ -38,7 +38,7 @@ function cookieOptions(scope: Scope): CookieOptions {
   return {
     httpOnly: true,
     sameSite: "strict",
-    secure: config.isProduction,
+    secure: config.cookieSecure,
     path: SCOPES[scope].path,
   };
 }

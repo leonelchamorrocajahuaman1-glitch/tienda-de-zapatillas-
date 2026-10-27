@@ -20,14 +20,18 @@ export function createApp() {
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: "same-site" },
+      // HSTS y upgrade-insecure-requests solo tienen sentido detrás de HTTPS (producción)
+      strictTransportSecurity: config.isProduction,
       contentSecurityPolicy: {
         directives: {
+          upgradeInsecureRequests: config.isProduction ? [] : null,
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
+          scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
           imgSrc: ["'self'", "data:", "blob:"],
-          connectSrc: ["'self'", "blob:", "data:"],
+          // gstatic: decodificadores Draco/KTX2 que <model-viewer> descarga si el modelo los usa
+          connectSrc: ["'self'", "blob:", "data:", "https://www.gstatic.com"],
           workerSrc: ["'self'", "blob:"],
           mediaSrc: ["'self'", "blob:"],
         },

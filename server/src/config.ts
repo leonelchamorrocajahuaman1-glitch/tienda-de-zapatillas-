@@ -32,6 +32,8 @@ if (isProduction && (jwtStore.length < 32 || jwtAdmin.length < 32)) {
 
 export const config = {
   isProduction,
+  // Cookies "Secure" (solo HTTPS). Por defecto activas en producción.
+  cookieSecure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === "true" : isProduction,
   port: int("PORT", 4000),
   databaseUrl: required("DATABASE_URL"),
   jwtSecretStore: jwtStore,

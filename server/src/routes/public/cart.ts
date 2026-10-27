@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../db";
@@ -23,13 +24,17 @@ cartRouter.post("/quote", async (req, res) => {
 });
 
 async function getCart(userId: string) {
-  const cart = await prisma.cart.upsert({
-    where: { userId },
-    create: { userId },
-    update: {},
-    include: { items: { orderBy: { createdAt: "asc" } } },
-  });
-  return cart;
+  const include = { items: { orderBy: { createdAt: "asc" as const } } };
+  try {
+    return await prisma.cart.upsert({ where: { userId }, create: { userId }, update: {}, include });
+  } catch (err) {
+    // Dos peticiones simultáneas pueden intentar crear el carrito a la vez:
+    // la segunda falla por la restricción única y simplemente lee el existente.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return prisma.cart.findUniqueOrThrow({ where: { userId }, include });
+    }
+    throw err;
+  }
 }
 
 async function summary(userId: string) {

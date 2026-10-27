@@ -158,7 +158,7 @@ export default function ProductPage() {
                   className="visual"
                   onError={() => setModelFailed(true)}
                 />
-                <span className="viewer__hint eyebrow">Arrastra para girar · Rueda o pellizco para acercar</span>
+                <span className="viewer__hint eyebrow">Arrastra para girar · Pellizca o usa la rueda para acercar</span>
               </>
             ) : images[imageIdx] ? (
               <ProductVisual name={p.name} modelUrl={null} images={[images[imageIdx]]} />

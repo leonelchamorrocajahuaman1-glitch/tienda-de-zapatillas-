@@ -418,8 +418,11 @@ model-viewer {
   }
   .hero__content {
     grid-template-columns: 1fr;
-    inset: auto 0 10%;
+    inset: auto 0 8%;
     gap: 16px;
+  }
+  .hero .scroll-cue {
+    display: none;
   }
 }
 
@@ -972,6 +975,10 @@ model-viewer {
   left: 50%;
   bottom: 14px;
   transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  text-align: center;
+  font-size: 10px;
   pointer-events: none;
 }
 

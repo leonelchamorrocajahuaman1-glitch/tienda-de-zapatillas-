@@ -412,6 +412,7 @@ textarea {
 
 .page-title {
   font-size: clamp(48px, 9vw, 120px);
+  margin-bottom: 28px;
 }
 
 .empty {
