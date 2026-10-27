@@ -19,9 +19,14 @@
       "acento": "#2f8cff",
       "destacado": true,
       "publicar": true,
-      "precio": null,
+      "precio": 549.9,
       "descuento": 0,
-      "stock": {},
+      "stock": {
+        "39": 2,
+        "40": 2,
+        "41": 2,
+        "42": 2
+      },
       "imagenes": [
         "nike-air-max-270.webp",
         "nike-air-max-270-poster.webp"
@@ -57,9 +62,14 @@
       "acento": "#ff2a2a",
       "destacado": true,
       "publicar": true,
-      "precio": null,
+      "precio": 799.9,
       "descuento": 0,
-      "stock": {},
+      "stock": {
+        "39": 2,
+        "40": 2,
+        "41": 2,
+        "42": 2
+      },
       "imagenes": [
         "air-jordan-1-high-og.webp",
         "air-jordan-1-high-og-poster.webp"
@@ -76,9 +86,14 @@
       "acento": "#8a4dff",
       "destacado": true,
       "publicar": true,
-      "precio": null,
+      "precio": 429.9,
       "descuento": 0,
-      "stock": {},
+      "stock": {
+        "39": 2,
+        "40": 2,
+        "41": 2,
+        "42": 2
+      },
       "imagenes": [
         "puma-rs-x.webp",
         "puma-rs-x-poster.webp"
@@ -152,9 +167,14 @@
       "acento": "#39e639",
       "destacado": true,
       "publicar": true,
-      "precio": null,
+      "precio": 899.9,
       "descuento": 0,
-      "stock": {},
+      "stock": {
+        "39": 2,
+        "40": 2,
+        "41": 2,
+        "42": 2
+      },
       "imagenes": [
         "nike-vapormax.webp",
         "nike-vapormax-poster.webp"

@@ -199,7 +199,7 @@ Para vender de verdad, cambia en Render el servicio y la base de datos a un plan
 
 - Un solo servicio de Node sirve la tienda en `/`, el panel en `/admin` y la API en `/api`.
 - Las imágenes y los modelos 3D se guardan **en la base de datos** (tabla `StoredFile`), así que no hace falta un disco permanente y una copia de la base incluye también los archivos.
-- Al arrancar (`npm run start:prod`) se aplican las migraciones, se crea el administrador si falta y se importa el catálogo **solo si la base está vacía**. Así no reaparece un producto que hayas borrado.
+- Al arrancar (`npm run start:prod`) se aplican las migraciones, se crea el administrador si falta y se aplica el catálogo: con la base vacía lo importa entero; si ya hay productos, solo **completa** los existentes (precio, stock y publicación si aún no los tienen). No pisa lo que cambies en el panel ni vuelve a crear un producto que hayas borrado.
 - Los secretos de sesión los genera Render. HTTPS viene incluido, así que las cookies son `Secure`.
 - Para usar tu propio dominio (p. ej. `www.sole20.pe`): en Render, **Settings → Custom Domains**.
 - En otro proveedor (Railway, un VPS…): `npm ci --include=dev && npm run build` y luego `npm run start:prod`, con las variables de `server/.env.example`. Para probarlo en tu PC sin HTTPS, usa `COOKIE_SECURE=false`.
@@ -217,7 +217,7 @@ Para vender de verdad, cambia en Render el servicio y la base de datos a un plan
 | `npm run db:studio` | Explorador visual de la base de datos |
 | `npm run typecheck` | Comprobación de tipos de todo el proyecto |
 | `npm test` | Pruebas de extremo a extremo de la API (requiere `TEST_DATABASE_URL`) |
-| `npm run build` / `npm run start:prod` | Compilar y ejecutar en modo producción (migra, crea el admin e importa el catálogo si la base está vacía) |
+| `npm run build` / `npm run start:prod` | Compilar y ejecutar en modo producción (migra, crea el admin y aplica el catálogo) |
 
 **Pruebas automáticas:** crea una base de datos vacía cuyo nombre termine en `_test` y ejecuta:
 

@@ -82,13 +82,11 @@ async function storeImage(fileName: string): Promise<string> {
 async function main() {
   // Opciones:
   //   npm run catalogo:importar -- ruta/al/archivo.json   (otro archivo)
-  //   npm run catalogo:importar -- --solo-si-vacio        (solo si la tienda no tiene productos;
-  //                                                        lo usa el arranque en el hosting)
+  //   --arranque   (lo usa el arranque en el hosting): si la base está vacía importa todo;
+  //                si ya tiene productos, solo COMPLETA los existentes (precio, stock,
+  //                imágenes, publicación) y no vuelve a crear los que borraste en el panel.
   const args = process.argv.slice(2);
-  if (args.includes("--solo-si-vacio") && (await prisma.product.count()) > 0) {
-    console.log("Catálogo: la base ya tiene productos, no se importa nada.");
-    return;
-  }
+  const onlyComplete = args.includes("--arranque") && (await prisma.product.count()) > 0;
   const fileArg = args.find((a) => !a.startsWith("--"));
   const catalogFile = fileArg ? path.resolve(fileArg) : path.join(CATALOG_DIR, "productos.json");
   const raw = JSON.parse(fs.readFileSync(catalogFile, "utf8"));
@@ -105,6 +103,9 @@ async function main() {
 
   for (const [index, p] of products.entries()) {
     const notes: string[] = [];
+    if (onlyComplete && !(await prisma.product.findUnique({ where: { slug: p.slug }, select: { id: true } }))) {
+      continue; // borrado en el panel: no se vuelve a crear
+    }
     const brand = p.marca ? await findOrCreateBrand(p.marca) : null;
     const category = p.categoria ? await findOrCreateCategory(p.categoria) : null;
     const color = await findOrCreateColor(p.color);
