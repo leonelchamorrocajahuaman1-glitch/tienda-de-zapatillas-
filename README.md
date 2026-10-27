@@ -99,6 +99,11 @@ npm run catalogo:importar
 - El importador **no sobrescribe** lo que cambies en el panel: solo crea lo que falta. Se puede ejecutar varias veces sin problema.
 - Air Max 270, Air Jordan 1, RS-X y VaporMax vienen marcados como **destacados** (escenas de la portada). Cámbialo con la casilla "Destacar en la portada".
 - Para añadir más modelos: agrega entradas al JSON y sus fotos a `server/catalog/imagenes/`, o créalos desde el panel.
+- **Modelos 3D del catálogo:** pon el `.glb` en `server/catalog/modelos/` y su nombre en el campo `"modelo"` del producto. Se asocia al publicar si el producto aún no tiene un modelo subido desde el panel. Antes de subirlo, conviene comprimirlo para que cargue rápido en el celular:
+  ```bash
+  npx @gltf-transform/cli optimize original.glb server/catalog/modelos/nombre.glb --compress quantize --texture-compress webp --texture-size 2048
+  ```
+  Usa `quantize`, no `meshopt` ni `draco`: así el visor no necesita descargar decodificadores externos.
 
 ## 4. Entrar al panel administrativo
 

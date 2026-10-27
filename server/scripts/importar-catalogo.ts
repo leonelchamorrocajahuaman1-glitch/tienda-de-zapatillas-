@@ -15,10 +15,11 @@ import path from "node:path";
 import { z } from "zod";
 import { prisma } from "../src/db";
 import { slugify } from "../src/lib/slug";
-import { imageMime, saveFile } from "../src/storage/uploads";
+import { imageMime, modelMime, removeByUrl, saveFile } from "../src/storage/uploads";
 
 const CATALOG_DIR = path.resolve(__dirname, "../catalog");
 const IMAGES_DIR = path.join(CATALOG_DIR, "imagenes");
+const MODELS_DIR = path.join(CATALOG_DIR, "modelos");
 
 const DEFAULT_HEX: Record<string, string> = {
   negro: "#111111",
@@ -48,6 +49,8 @@ const item = z.object({
   descuento: z.number().int().min(0).max(90).default(0),
   stock: z.record(z.string(), z.number().int().min(0)).default({}),
   imagenes: z.array(z.string()).default([]),
+  /** archivo .glb/.gltf en server/catalog/modelos/ */
+  modelo: z.string().nullable().default(null),
 });
 const file = z.object({ productos: z.array(item) });
 
@@ -104,6 +107,30 @@ async function refreshCatalogImages(productId: string, fileNames: string[]): Pro
     updated++;
   }
   return updated;
+}
+
+/**
+ * Asocia el modelo 3D del catálogo al producto si aún no tiene uno, o lo
+ * actualiza si el del catálogo cambió y el actual vino del catálogo. Un modelo
+ * subido desde el panel nunca se reemplaza.
+ */
+async function syncCatalogModel(productId: string, currentUrl: string | null, fileName: string): Promise<string | null> {
+  const source = path.join(MODELS_DIR, fileName);
+  if (!fs.existsSync(source)) return `falta el modelo ${fileName}`;
+  const size = fs.statSync(source).size;
+  if (currentUrl) {
+    const id = currentUrl.match(/^\/uploads\/([a-z0-9]+)/i)?.[1];
+    const stored = id
+      ? await prisma.storedFile.findUnique({ where: { id }, select: { fileName: true, size: true } })
+      : null;
+    // Solo se toca si el modelo actual es el del catálogo y el archivo cambió
+    if (!stored || stored.fileName !== fileName || stored.size === size) return null;
+  }
+  const data = fs.readFileSync(source);
+  const url = await saveFile("model", data, modelMime(data, fileName), fileName);
+  await prisma.product.update({ where: { id: productId }, data: { modelUrl: url, modelFileName: fileName } });
+  if (currentUrl) await removeByUrl(currentUrl);
+  return currentUrl ? "modelo 3D actualizado" : "modelo 3D añadido";
 }
 
 async function main() {
@@ -182,6 +209,11 @@ async function main() {
     } else if (imageCount > 0) {
       const updated = await refreshCatalogImages(product.id, p.imagenes);
       if (updated) notes.push(`${updated} imagen(es) mejoradas`);
+    }
+
+    if (p.modelo) {
+      const result = await syncCatalogModel(product.id, product.modelUrl, p.modelo);
+      if (result) notes.push(result);
     }
 
     const variantCount = await prisma.productVariant.count({ where: { productId: product.id } });

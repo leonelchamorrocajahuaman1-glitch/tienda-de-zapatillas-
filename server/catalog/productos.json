@@ -5,7 +5,8 @@
     "stock: unidades por talla EU, ej. {\"40\": 3, \"41\": 5}. Las tallas deben existir (35 a 45 vienen creadas).",
     "Un producto se PUBLICA automáticamente solo si tiene precio, stock e imágenes y \"publicar\" es true.",
     "Volver a ejecutar el importador NO sobrescribe lo que cambies en el panel: solo crea lo que falta",
-    "(productos nuevos, precio si aún no tiene, inventario si aún no tiene, imágenes si aún no tiene)."
+    "(productos nuevos, precio si aún no tiene, inventario si aún no tiene, imágenes si aún no tiene).",
+    "modelo: archivo .glb en server/catalog/modelos/ (p. ej. \"nike-air-max-270.glb\"). Se asocia solo si el producto no tiene ya un modelo subido desde el panel."
   ],
   "productos": [
     {
@@ -30,7 +31,8 @@
       "imagenes": [
         "nike-air-max-270.webp",
         "nike-air-max-270-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "adidas-ultra-4d",
@@ -49,7 +51,8 @@
       "imagenes": [
         "adidas-ultra-4d.webp",
         "adidas-ultra-4d-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "air-jordan-1-high-og",
@@ -73,7 +76,8 @@
       "imagenes": [
         "air-jordan-1-high-og.webp",
         "air-jordan-1-high-og-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "puma-rs-x",
@@ -97,7 +101,8 @@
       "imagenes": [
         "puma-rs-x.webp",
         "puma-rs-x-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "nike-zoomx-invincible",
@@ -116,7 +121,8 @@
       "imagenes": [
         "nike-zoomx-invincible.webp",
         "nike-zoomx-invincible-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "adidas-nmd-s1",
@@ -135,7 +141,8 @@
       "imagenes": [
         "adidas-nmd-s1.webp",
         "adidas-nmd-s1-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "air-jordan-4-retro",
@@ -154,7 +161,8 @@
       "imagenes": [
         "air-jordan-4-retro.webp",
         "air-jordan-4-retro-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "nike-vapormax",
@@ -178,7 +186,8 @@
       "imagenes": [
         "nike-vapormax.webp",
         "nike-vapormax-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "adidas-yeezy-350-v2",
@@ -197,7 +206,8 @@
       "imagenes": [
         "adidas-yeezy-350-v2.webp",
         "adidas-yeezy-350-v2-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "nike-lebron-xx",
@@ -216,7 +226,8 @@
       "imagenes": [
         "nike-lebron-xx.webp",
         "nike-lebron-xx-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "puma-future-rider",
@@ -235,7 +246,8 @@
       "imagenes": [
         "puma-future-rider.webp",
         "puma-future-rider-poster.webp"
-      ]
+      ],
+      "modelo": null
     },
     {
       "slug": "adidas-ozweego",
@@ -254,7 +266,8 @@
       "imagenes": [
         "adidas-ozweego.webp",
         "adidas-ozweego-poster.webp"
-      ]
+      ],
+      "modelo": null
     }
   ]
 }
