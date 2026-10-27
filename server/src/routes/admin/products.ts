@@ -7,7 +7,7 @@ import { finalPrice } from "../../lib/pricing";
 import { slugify } from "../../lib/slug";
 import { parse } from "../../lib/validate";
 import { setStock } from "../../services/inventory";
-import { imageMime, imageUpload, modelMime, modelUpload, removeByUrl, saveFile } from "../../storage/uploads";
+import { imageMime, imageUpload, modelMime, modelUpload, removeByUrl, saveFile, spinUpload } from "../../storage/uploads";
 
 export const adminProductsRouter = Router();
 
@@ -32,6 +32,8 @@ async function loadDetail(id: string) {
   });
   return {
     ...product,
+    images: product.images.filter((i) => i.kind === "GALLERY"),
+    spin: product.images.filter((i) => i.kind === "SPIN"),
     variants: product.variants.sort(
       (a, b) => a.color.name.localeCompare(b.color.name) || a.size.sortOrder - b.size.sortOrder,
     ),
@@ -77,7 +79,8 @@ adminProductsRouter.get("/", async (req, res) => {
     include: {
       brand: true,
       category: true,
-      images: { orderBy: { sortOrder: "asc" }, take: 1 },
+      images: { where: { kind: "GALLERY" }, orderBy: { sortOrder: "asc" }, take: 1 },
+      _count: { select: { images: { where: { kind: "SPIN" } } } },
       variants: { select: { stock: true, reserved: true, active: true } },
     },
     orderBy: { updatedAt: "desc" },
@@ -95,6 +98,7 @@ adminProductsRouter.get("/", async (req, res) => {
       discountPercent: p.discountPercent,
       finalPriceCents: finalPrice(p.priceCents, p.discountPercent),
       imageUrl: p.images[0]?.url ?? null,
+      hasSpin: p._count.images > 0,
       hasModel: Boolean(p.modelUrl),
       variantCount: p.variants.length,
       stock: p.variants.reduce((s, v) => s + v.stock, 0),
@@ -189,7 +193,7 @@ adminProductsRouter.post("/:id/status", async (req, res) => {
   const body = parse(z.object({ status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]) }), req.body);
   const product = await prisma.product.findUnique({
     where: { id: req.params.id },
-    include: { variants: { where: { active: true } }, images: true },
+    include: { variants: { where: { active: true } }, images: { where: { kind: "GALLERY" } } },
   });
   if (!product) throw notFound("Producto no encontrado");
   if (body.status === "PUBLISHED") {
@@ -304,7 +308,10 @@ adminProductsRouter.put("/:id/variants", async (req, res) => {
 
 adminProductsRouter.post("/:id/images", imageUpload.array("images", 10), async (req, res) => {
   const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-  const product = await prisma.product.findUnique({ where: { id: String(req.params.id) }, include: { images: true } });
+  const product = await prisma.product.findUnique({
+    where: { id: String(req.params.id) },
+    include: { images: { where: { kind: "GALLERY" } } },
+  });
   if (!product) throw notFound("Producto no encontrado");
   if (files.length === 0) throw badRequest("Selecciona al menos una imagen");
   const colorId = typeof req.body.colorId === "string" && req.body.colorId ? req.body.colorId : null;
@@ -355,6 +362,48 @@ adminProductsRouter.delete("/:id/images/:imageId", async (req, res) => {
   const usedInOrders = await prisma.orderItem.count({ where: { imageUrl: image.url } });
   if (!usedInOrders) await removeByUrl(image.url);
   res.json(await loadDetail(req.params.id));
+});
+
+// ───────────────────────── Vista 360° ─────────────────────────
+// Fotogramas tomados girando la zapatilla. El panel los envía por tandas
+// (ya ordenados por nombre de archivo) y aquí se añaden al final.
+
+const MAX_SPIN_FRAMES = 72;
+
+adminProductsRouter.post("/:id/spin", spinUpload.array("frames", 12), async (req, res) => {
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  const product = await prisma.product.findUnique({ where: { id: String(req.params.id) } });
+  if (!product) throw notFound("Producto no encontrado");
+  if (files.length === 0) throw badRequest("Selecciona las fotos de la vista 360°");
+  const existing = await prisma.productImage.aggregate({
+    where: { productId: product.id, kind: "SPIN" },
+    _count: { _all: true },
+    _max: { sortOrder: true },
+  });
+  if (existing._count._all + files.length > MAX_SPIN_FRAMES) {
+    throw badRequest(`La vista 360° admite como máximo ${MAX_SPIN_FRAMES} fotos`);
+  }
+  const mimes = files.map((f) => imageMime(f.buffer));
+  let order = existing._max.sortOrder ?? -1;
+  for (const [i, f] of files.entries()) {
+    await prisma.productImage.create({
+      data: {
+        productId: product.id,
+        kind: "SPIN",
+        url: await saveFile("image", f.buffer, mimes[i], f.originalname),
+        alt: `${product.name} — vista 360°`,
+        sortOrder: ++order,
+      },
+    });
+  }
+  res.status(201).json(await loadDetail(product.id));
+});
+
+adminProductsRouter.delete("/:id/spin", async (req, res) => {
+  const frames = await prisma.productImage.findMany({ where: { productId: String(req.params.id), kind: "SPIN" } });
+  await prisma.productImage.deleteMany({ where: { id: { in: frames.map((f) => f.id) } } });
+  await Promise.all(frames.map((f) => removeByUrl(f.url)));
+  res.json(await loadDetail(String(req.params.id)));
 });
 
 // ───────────────────────── Modelo 3D ─────────────────────────

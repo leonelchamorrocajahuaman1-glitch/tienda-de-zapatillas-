@@ -29,6 +29,7 @@ export function ProductCard({ product, index = 0 }: { product: ProductSummary; i
               <CubeIcon width={12} height={12} /> 3D
             </span>
           )}
+          {product.hasSpin && <span className="badge badge--3d">360°</span>}
           {product.discountPercent > 0 && <span className="badge badge--accent">-{product.discountPercent}%</span>}
         </div>
         {!product.inStock && <span className="card__soldout display">Agotado</span>}

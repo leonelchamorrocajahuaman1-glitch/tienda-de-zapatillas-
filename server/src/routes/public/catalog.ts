@@ -14,11 +14,19 @@ export const catalogRouter = Router();
 const summaryInclude = {
   brand: true,
   category: true,
-  images: { orderBy: { sortOrder: "asc" }, take: 2 },
+  images: { where: { kind: "GALLERY" }, orderBy: { sortOrder: "asc" }, take: 2 },
   variants: { where: { active: true }, include: { size: true, color: true } },
+  _count: { select: { images: { where: { kind: "SPIN" } } } },
 } satisfies Prisma.ProductInclude;
 
 type ProductWithSummary = Prisma.ProductGetPayload<{ include: typeof summaryInclude }>;
+
+const spinFrames = (productId: string) =>
+  prisma.productImage.findMany({
+    where: { productId, kind: "SPIN" },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, url: true },
+  });
 
 function toSummary(p: ProductWithSummary) {
   const sizes = new Map<string, { label: string; sortOrder: number; available: boolean }>();
@@ -49,6 +57,7 @@ function toSummary(p: ProductWithSummary) {
     featured: p.featured,
     modelUrl: p.modelUrl,
     images: p.images.map((i) => ({ id: i.id, url: i.url, alt: i.alt })),
+    hasSpin: p._count.images > 0,
     sizes: [...sizes.values()].sort((a, b) => a.sortOrder - b.sortOrder).map(({ label, available }) => ({ label, available })),
     colors: [...colors.values()],
     inStock: totalAvailable > 0,
@@ -140,7 +149,11 @@ catalogRouter.get("/featured", async (_req, res) => {
     orderBy: { publishedAt: "desc" },
     take: 8,
   });
-  res.json({ featured: products.map(toSummary), latest: latest.map(toSummary) });
+  // Los destacados incluyen sus fotogramas 360° para girarlos con el scroll en la portada
+  const featured = await Promise.all(
+    products.map(async (p) => ({ ...toSummary(p), spin: p._count.images ? await spinFrames(p.id) : [] })),
+  );
+  res.json({ featured, latest: latest.map(toSummary) });
 });
 
 /** Parámetros públicos de la tienda (envío y métodos de pago). */
@@ -183,19 +196,21 @@ catalogRouter.get("/products/:slug", async (req, res) => {
     include: {
       brand: true,
       category: true,
-      images: { orderBy: { sortOrder: "asc" } },
+      images: { where: { kind: "GALLERY" }, orderBy: { sortOrder: "asc" } },
       variants: {
         where: { active: true },
         include: { size: true, color: true },
       },
+      _count: { select: { images: { where: { kind: "SPIN" } } } },
     },
   });
   if (!product) throw notFound("Producto no encontrado");
-  const summary = toSummary({ ...product, images: product.images });
+  const summary = toSummary(product);
   res.json({
     ...summary,
     description: product.description,
     images: product.images.map((i) => ({ id: i.id, url: i.url, alt: i.alt, colorId: i.colorId })),
+    spin: await spinFrames(product.id),
     variants: product.variants
       .sort((a, b) => a.size.sortOrder - b.size.sortOrder)
       .map((v) => ({

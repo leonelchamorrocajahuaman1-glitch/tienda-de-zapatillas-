@@ -152,12 +152,33 @@ Para ver directamente las tablas: `npm run db:studio` (abre Prisma Studio en el 
 - Los archivos subidos se validan por su contenido real (no solo por la extensión).
 - Las credenciales y los secretos viven en `server/.env`, que no se sube al repositorio.
 
-## 8. Modelos 3D
+## 8. Vista 360° con fotos
+
+Además del modelo 3D, cada zapatilla puede tener una **vista 360° hecha con fotos reales**. El cliente la gira arrastrando con el mouse o el dedo, la acerca con doble clic o con el botón "Acercar", y también puede girarla con las flechas del teclado. En la portada, las zapatillas destacadas con vista 360° giran solas con el scroll.
+
+**Cómo hacerla con tu celular:**
+1. Pon la zapatilla sobre una **base giratoria** (un plato giratorio de cocina sirve) con un fondo liso detrás.
+2. Fija el celular (trípode o apoyado) a la altura de la zapatilla. Usa siempre la misma luz y no muevas la cámara.
+3. Toma **24 a 36 fotos**, girando la base un poco antes de cada foto (de 10° a 15°) hasta dar la vuelta completa.
+4. Si las fotos no salen numeradas en orden, nómbralas así: `01.jpg`, `02.jpg`… (se ordenan por nombre).
+5. En el panel: **Productos → la zapatilla → Vista 360° (fotos)** → selecciona **todas las fotos a la vez**.
+
+Recomendado: fotos de 1500 a 2000 px de ancho y como máximo 6 MB cada una. Admite hasta 72 fotos.
+
+En la ficha del producto, la tienda muestra primero el modelo 3D (si existe), después la vista 360° y después las fotos.
+
+## 8b. Calidad de las fotos
+
+- Las fotos del catálogo inicial salen de una imagen de unos 380 px por modelo. Se ampliaron ×4 con una red de superresolución (EDSR): se ven más nítidas, pero no tienen el detalle de una foto original. **Para la máxima calidad, sube fotos propias** de 1500 a 2000 px desde el panel.
+- Si se actualiza una foto en `server/catalog/imagenes/`, el importador la sustituye en la tienda al publicar, siempre que no la hayas cambiado desde el panel. Los pedidos antiguos conservan su foto original.
+
+## 8c. Modelos 3D
 
 - Visor: [`<model-viewer>`](https://modelviewer.dev). Permite girar el modelo con el mouse o el dedo y acercarlo con la rueda o pellizcando. Se carga solo cuando hace falta.
 - Desde **Panel → Producto → Modelo 3D** se sube un `.glb` (recomendado) o un `.gltf` con las texturas incrustadas, de hasta 60 MB. No hace falta tocar el código.
-- Si un producto no tiene modelo, o si el modelo falla al cargar, la tienda muestra sus fotos. Si tampoco tiene fotos, muestra una silueta rotulada "Modelo 3D no disponible". **Nunca se inventa un modelo.**
+- Si un producto no tiene modelo, o si el modelo falla al cargar, la tienda muestra su vista 360° o sus fotos. Si tampoco tiene fotos, muestra una silueta rotulada "Modelo 3D no disponible". **Nunca se inventa un modelo.**
 - En la portada, el modelo de cada producto destacado gira según el scroll.
+- **Cómo conseguir un modelo 3D de tus zapatillas reales:** con una app de escaneo 3D para celular que exporte `.glb` (por ejemplo Polycam o KIRI Engine). Rodeas la zapatilla grabando o tomando fotos y la app genera el modelo. Revisa que se vea bien y súbelo en el panel.
 - Exporta los modelos con origen centrado y escala real. Si usan compresión Draco/KTX2, el visor descarga sus decodificadores desde `www.gstatic.com`.
 
 ## 9. Personalización

@@ -160,6 +160,29 @@ run("Flujo completo tienda + panel sobre la misma base de datos", () => {
     expect(list.body.items[0].finalPriceCents).toBe(19990);
   });
 
+  it("vista 360°: el admin sube fotogramas y la tienda los muestra en orden", async () => {
+    let req = adminAgent.post(`/api/admin/products/${productId}/spin`);
+    for (const n of ["01", "02", "03"]) req = req.attach("frames", PNG, { filename: `${n}.png`, contentType: "image/png" });
+    const up = await req;
+    expect(up.status).toBe(201);
+    expect(up.body.spin).toHaveLength(3);
+    expect(up.body.images).toHaveLength(1); // la galería no cambia
+
+    const detail = await request(app).get("/api/catalog/products/urban-x");
+    expect(detail.body.spin).toHaveLength(3);
+    expect(detail.body.images).toHaveLength(1);
+    const list = await request(app).get("/api/catalog/products");
+    expect(list.body.items[0].hasSpin).toBe(true);
+    const featured = await request(app).get("/api/catalog/featured");
+    expect(featured.body.featured[0].spin).toHaveLength(3);
+
+    // Un cliente no puede subir fotogramas
+    const anon = await request(app)
+      .post(`/api/admin/products/${productId}/spin`)
+      .attach("frames", PNG, { filename: "x.png", contentType: "image/png" });
+    expect(anon.status).toBe(401);
+  });
+
   it("8. el cliente consulta el detalle", async () => {
     const res = await request(app).get("/api/catalog/products/urban-x");
     expect(res.status).toBe(200);

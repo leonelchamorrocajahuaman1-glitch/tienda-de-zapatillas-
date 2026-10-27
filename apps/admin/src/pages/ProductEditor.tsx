@@ -48,6 +48,7 @@ interface Product {
   modelFileName: string | null;
   publishedAt: string | null;
   images: { id: string; url: string; alt: string; colorId: string | null; sortOrder: number }[];
+  spin: { id: string; url: string; sortOrder: number }[];
   variants: Variant[];
   priceHistory: { id: string; priceCents: number; discountPercent: number; createdAt: string; changedBy: { name: string } | null }[];
   unitsSold: number;
@@ -287,6 +288,7 @@ export function ProductEditorPage() {
             <>
               <InventoryCard product={p} colors={colors.data ?? []} sizes={sizes.data ?? []} onSaved={setProduct} />
               <ImagesCard product={p} colors={colors.data ?? []} onSaved={setProduct} />
+              <SpinCard product={p} onSaved={setProduct} />
               <ModelCard product={p} onSaved={setProduct} />
             </>
           ) : (
@@ -654,6 +656,131 @@ function ImagesCard({ product, colors, onSaved }: { product: Product; colors: Co
             ))}
           </div>
         )}
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────── Vista 360° ───────────────────────────
+
+/** Orden natural: foto2.jpg antes que foto10.jpg */
+const naturalSort = (a: File, b: File) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+
+function SpinCard({ product, onSaved }: { product: Product; onSaved: (p: Product) => void }) {
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [frame, setFrame] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const frames = product.spin;
+
+  useEffect(() => {
+    if (!playing || frames.length < 2) return;
+    const t = window.setInterval(() => setFrame((f) => (f + 1) % frames.length), 120);
+    return () => window.clearInterval(t);
+  }, [playing, frames.length]);
+
+  useEffect(() => setFrame(0), [frames.length]);
+
+  async function upload(list: FileList | File[]) {
+    const files = [...list].sort(naturalSort);
+    if (!files.length) return;
+    if (frames.length && !confirm("Ya hay una vista 360°. ¿Reemplazarla por estas fotos?")) return;
+    try {
+      let current = product;
+      if (frames.length) current = await api.del<Product>(`/api/admin/products/${product.id}/spin`);
+      setProgress({ done: 0, total: files.length });
+      // Se envían por tandas pequeñas para no saturar el servidor
+      for (let i = 0; i < files.length; i += 8) {
+        const fd = new FormData();
+        files.slice(i, i + 8).forEach((f) => fd.append("frames", f));
+        current = await api.post<Product>(`/api/admin/products/${product.id}/spin`, fd);
+        setProgress({ done: Math.min(i + 8, files.length), total: files.length });
+      }
+      onSaved(current);
+      toast(`Vista 360° creada con ${files.length} fotos`);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+      api.get<Product>(`/api/admin/products/${product.id}`).then(onSaved).catch(() => undefined);
+    } finally {
+      setProgress(null);
+      if (input.current) input.current.value = "";
+    }
+  }
+
+  async function remove() {
+    if (!confirm("¿Eliminar la vista 360° de este producto?")) return;
+    try {
+      onSaved(await api.del<Product>(`/api/admin/products/${product.id}/spin`));
+      toast("Vista 360° eliminada");
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
+  }
+
+  return (
+    <section className="card">
+      <div className="card__head">
+        <h2>Vista 360° (fotos)</h2>
+        {frames.length > 0 && (
+          <button className="btn btn--sm btn--danger" onClick={remove}>
+            Quitar vista 360°
+          </button>
+        )}
+      </div>
+      <div className="card__body form-grid">
+        {frames.length > 0 ? (
+          <>
+            <div className="spin-preview">
+              <img src={frames[frame]?.url} alt={`Fotograma ${frame + 1}`} />
+            </div>
+            <div className="inline-form" style={{ alignItems: "center" }}>
+              <button className="btn btn--sm" onClick={() => setPlaying((p) => !p)}>
+                {playing ? "Pausar" : "Girar"}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={frames.length - 1}
+                value={frame}
+                onChange={(e) => {
+                  setPlaying(false);
+                  setFrame(Number(e.target.value));
+                }}
+                style={{ flex: 1 }}
+                aria-label="Fotograma"
+              />
+              <span className="muted num">
+                {frame + 1}/{frames.length}
+              </span>
+            </div>
+          </>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>
+            Sin vista 360°. Los clientes podrán girar la zapatilla arrastrando con el mouse o el dedo.
+          </p>
+        )}
+        <label className="dropzone">
+          <input
+            ref={input}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            multiple
+            onChange={(e) => e.target.files && upload(e.target.files)}
+          />
+          <strong>
+            {progress
+              ? `Subiendo ${progress.done}/${progress.total} fotos…`
+              : frames.length
+                ? "Reemplazar fotos de la vista 360°"
+                : "Subir fotos de la vista 360° (selecciona todas a la vez)"}
+          </strong>
+          <span style={{ fontSize: 12 }}>
+            24 a 36 fotos (máx. 72), una cada 10–15° girando la zapatilla sobre una base giratoria, con la cámara fija, la
+            misma luz y fondo liso. Se ordenan por nombre de archivo (01.jpg, 02.jpg…). Máx. 6 MB por foto; mejor 1500–2000 px
+            de ancho.
+          </span>
+        </label>
       </div>
     </section>
   );

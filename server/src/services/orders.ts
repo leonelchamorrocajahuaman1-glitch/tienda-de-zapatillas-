@@ -54,7 +54,7 @@ export async function createOrderFromCart(
                 include: {
                   size: true,
                   color: true,
-                  product: { include: { brand: true, images: { orderBy: { sortOrder: "asc" } } } },
+                  product: { include: { brand: true, images: { where: { kind: "GALLERY" }, orderBy: { sortOrder: "asc" } } } },
                 },
               },
             },

@@ -27,14 +27,24 @@ export interface ProductSummary {
   featured: boolean;
   modelUrl: string | null;
   images: { id: string; url: string; alt: string }[];
+  /** tiene vista 360° hecha con fotos */
+  hasSpin: boolean;
+  /** fotogramas 360° (solo en los destacados de la portada) */
+  spin?: SpinFrame[];
   sizes: { label: string; available: boolean }[];
   colors: ColorRef[];
   inStock: boolean;
 }
 
-export interface ProductDetail extends Omit<ProductSummary, "images"> {
+export interface SpinFrame {
+  id: string;
+  url: string;
+}
+
+export interface ProductDetail extends Omit<ProductSummary, "images" | "spin"> {
   description: string;
   images: { id: string; url: string; alt: string; colorId: string | null }[];
+  spin: SpinFrame[];
   variants: { id: string; size: string; colorId: string; available: number }[];
 }
 

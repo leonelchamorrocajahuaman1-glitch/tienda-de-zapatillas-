@@ -79,6 +79,33 @@ async function storeImage(fileName: string): Promise<string> {
   return saveFile("image", data, imageMime(data), fileName);
 }
 
+/**
+ * Si una foto del catálogo cambió en el repositorio (p. ej. una versión de más
+ * calidad), la sustituye en la tienda. Solo toca las fotos que vinieron del
+ * catálogo (mismo nombre de archivo); las que subiste desde el panel no se tocan.
+ */
+async function refreshCatalogImages(productId: string, fileNames: string[]): Promise<number> {
+  const images = await prisma.productImage.findMany({ where: { productId, kind: "GALLERY" } });
+  let updated = 0;
+  for (const image of images) {
+    const id = image.url.match(/^\/uploads\/([a-z0-9]+)/i)?.[1];
+    if (!id) continue;
+    const stored = await prisma.storedFile.findUnique({ where: { id }, select: { fileName: true, data: true } });
+    if (!stored || !fileNames.includes(stored.fileName)) continue;
+    const source = path.join(IMAGES_DIR, stored.fileName);
+    if (!fs.existsSync(source)) continue;
+    const data = fs.readFileSync(source);
+    if (Buffer.from(stored.data).equals(data)) continue;
+    const url = await saveFile("image", data, imageMime(data), stored.fileName);
+    await prisma.productImage.update({ where: { id: image.id }, data: { url } });
+    // Los pedidos antiguos conservan su foto original
+    const usedInOrders = await prisma.orderItem.count({ where: { imageUrl: image.url } });
+    if (!usedInOrders) await prisma.storedFile.delete({ where: { id } });
+    updated++;
+  }
+  return updated;
+}
+
 async function main() {
   // Opciones:
   //   npm run catalogo:importar -- ruta/al/archivo.json   (otro archivo)
@@ -144,7 +171,7 @@ async function main() {
       notes.push("precio asignado");
     }
 
-    const imageCount = await prisma.productImage.count({ where: { productId: product.id } });
+    const imageCount = await prisma.productImage.count({ where: { productId: product.id, kind: "GALLERY" } });
     if (imageCount === 0 && p.imagenes.length) {
       for (const [i, img] of p.imagenes.entries()) {
         await prisma.productImage.create({
@@ -152,6 +179,9 @@ async function main() {
         });
       }
       notes.push(`${p.imagenes.length} imágenes`);
+    } else if (imageCount > 0) {
+      const updated = await refreshCatalogImages(product.id, p.imagenes);
+      if (updated) notes.push(`${updated} imagen(es) mejoradas`);
     }
 
     const variantCount = await prisma.productVariant.count({ where: { productId: product.id } });

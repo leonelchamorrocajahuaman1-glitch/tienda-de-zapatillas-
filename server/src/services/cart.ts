@@ -50,7 +50,7 @@ export async function priceLines(inputs: LineInput[]): Promise<CartSummary> {
       size: true,
       color: true,
       product: {
-        include: { brand: true, images: { orderBy: { sortOrder: "asc" } } },
+        include: { brand: true, images: { where: { kind: "GALLERY" }, orderBy: { sortOrder: "asc" } } },
       },
     },
   });

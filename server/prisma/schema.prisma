@@ -110,19 +110,25 @@ model Product {
   @@index([categoryId])
 }
 
+enum ImageKind {
+  GALLERY // fotos normales del producto
+  SPIN // fotogramas de la vista 360° (fotos tomadas girando la zapatilla)
+}
+
 model ProductImage {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   productId String
   colorId   String? // imagen asociada a un color concreto (opcional)
+  kind      ImageKind @default(GALLERY)
   url       String
-  alt       String   @default("")
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
+  alt       String    @default("")
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   color   Color?  @relation(fields: [colorId], references: [id], onDelete: SetNull)
 
-  @@index([productId])
+  @@index([productId, kind])
 }
 
 // Inventario: una fila por combinación producto + talla + color.

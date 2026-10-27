@@ -26,6 +26,20 @@ export const imageUpload = multer({
   },
 });
 
+/** Fotogramas de la vista 360°: se suben por tandas para no saturar la memoria. */
+export const spinUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 6 * 1024 * 1024, files: 12 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!IMAGE_EXT.has(ext) || !file.mimetype.startsWith("image/")) {
+      cb(badRequest("La vista 360° solo admite fotos JPG, PNG, WEBP o AVIF"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
 export const modelUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 60 * 1024 * 1024, files: 1 },

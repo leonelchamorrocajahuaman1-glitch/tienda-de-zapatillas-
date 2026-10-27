@@ -1640,3 +1640,86 @@ model-viewer {
     display: none;
   }
 }
+
+/* ═══════════════════════ VISTA 360° ═══════════════════════ */
+.spin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  outline: none;
+}
+
+.spin--interactive {
+  cursor: grab;
+  touch-action: pan-y; /* el gesto vertical sigue haciendo scroll en el celular */
+}
+
+.spin--interactive:active {
+  cursor: grabbing;
+}
+
+.spin--interactive:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.spin__frames {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.35s var(--ease);
+}
+
+.spin.is-zoomed .spin__frames {
+  transform: scale(2.2);
+}
+
+.spin__frames img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 56%, transparent 71%);
+  mask-image: radial-gradient(ellipse at center, #000 56%, transparent 71%);
+  filter: drop-shadow(0 40px 40px rgba(0, 0, 0, 0.5));
+}
+
+.spin__frames img.is-on {
+  opacity: 1;
+}
+
+.viewer .spin__frames {
+  inset: 6%;
+}
+
+.spin__loading {
+  position: absolute;
+  inset: auto 20% 44px;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.spin__bar {
+  justify-self: start;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.spin__controls {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.spin__controls .badge {
+  cursor: pointer;
+  min-height: 30px;
+}

@@ -1,5 +1,7 @@
-import { forwardRef, useCallback, useState } from "react";
+import { forwardRef, useCallback, useState, type Ref } from "react";
+import type { SpinFrame } from "@tienda/shared";
 import { ModelViewer } from "./ModelViewer";
+import { Spin360, type SpinHandle } from "./Spin360";
 
 interface Props {
   name: string;
@@ -9,15 +11,18 @@ interface Props {
   autoRotate?: boolean;
   cameraOrbit?: string;
   className?: string;
+  /** fotogramas 360° reales: se usan si no hay modelo 3D */
+  spin?: SpinFrame[];
+  spinRef?: Ref<SpinHandle>;
 }
 
 /**
  * Muestra el modelo 3D real del producto si existe. Si no hay modelo (o falla
- * al cargar) usa la foto del producto; si tampoco hay foto, una silueta
+ * al cargar) usa su vista 360° con fotos reales y, si no, la foto del producto; si tampoco hay foto, una silueta
  * claramente rotulada como "sin modelo 3D". Nunca inventa un modelo.
  */
 export const ProductVisual = forwardRef<HTMLElement, Props>(function ProductVisual(
-  { name, modelUrl, images, interactive, autoRotate, cameraOrbit, className },
+  { name, modelUrl, images, interactive, autoRotate, cameraOrbit, className, spin, spinRef },
   ref,
 ) {
   const [failed, setFailed] = useState(false);
@@ -37,6 +42,13 @@ export const ProductVisual = forwardRef<HTMLElement, Props>(function ProductVisu
         className={`visual visual--model ${className ?? ""}`}
         onError={onError}
       />
+    );
+  }
+  if (spin && spin.length > 0) {
+    return (
+      <div className={`visual visual--spin ${className ?? ""}`}>
+        <Spin360 ref={spinRef} frames={spin} alt={`Vista 360° de ${name}`} />
+      </div>
     );
   }
   if (poster) {

@@ -7,6 +7,7 @@ import type { ProductSummary } from "@tienda/shared";
 import { api, prefersReducedMotion, STORE_NAME } from "../lib/api";
 import { useReveal } from "../lib/useReveal";
 import { ProductVisual } from "../components/ProductVisual";
+import type { SpinHandle } from "../components/Spin360";
 import { ProductCard } from "../components/ProductCard";
 import { SplitText } from "../components/SplitText";
 import { Price } from "../components/Price";
@@ -33,6 +34,9 @@ export function HomePage() {
   const flash = useRef<HTMLDivElement>(null);
   const heroModel = useRef<HTMLElement | null>(null);
   const sceneModels = useRef<(HTMLElement | null)[]>([]);
+  // Vistas 360° con fotos: también giran con el scroll
+  const heroSpin = useRef<SpinHandle | null>(null);
+  const sceneSpins = useRef<(SpinHandle | null)[]>([]);
 
   const featured = data?.featured ?? [];
   const latest = data?.latest ?? [];
@@ -74,7 +78,11 @@ export function HomePage() {
         .to(".hero__bgword", { xPercent: -18, ease: "none" }, 0)
         .to(".hero__side", { opacity: 0, scale: 0.8, ease: "none" }, 0)
         .to(".hero__stage", { scale: 1.22, yPercent: -4, ease: "none" }, 0)
-        .to(orbit, { deg: 160, ease: "none", onUpdate: () => setOrbit(heroModel.current, orbit.deg) }, 0)
+        .to(orbit, { deg: 160, ease: "none", onUpdate: () => {
+              setOrbit(heroModel.current, orbit.deg);
+              heroSpin.current?.setAngle(orbit.deg);
+            },
+          }, 0)
         .to(".hero__beams", { opacity: 0.25, ease: "none" }, 0);
 
       // Escenas por producto: fijadas, con texto que aparece y modelo girando
@@ -100,7 +108,11 @@ export function HomePage() {
           )
           .fromTo(scene.querySelector(".scene__name"), { xPercent: 18 }, { xPercent: -18, ease: "none" }, 0)
           .fromTo(scene.querySelector(".scene__stage"), { scale: 0.82 }, { scale: 1.08, ease: "none" }, 0)
-          .to(o, { deg: -150, ease: "none", onUpdate: () => setOrbit(sceneModels.current[i], o.deg) }, 0)
+          .to(o, { deg: -150, ease: "none", onUpdate: () => {
+              setOrbit(sceneModels.current[i], o.deg);
+              sceneSpins.current[i]?.setAngle(o.deg);
+            },
+          }, 0)
           .fromTo(scene.querySelector(".scene__info"), { opacity: 0, y: 40 }, { opacity: 1, y: 0 }, 0.35);
       });
 
@@ -139,6 +151,8 @@ export function HomePage() {
             <Link to={`/zapatilla/${hero.slug}`} className="hero__main" aria-label={`Ver ${hero.name}`}>
               <ProductVisual
                 ref={heroModel}
+                spinRef={heroSpin}
+                spin={hero.spin}
                 name={hero.name}
                 modelUrl={hero.modelUrl}
                 images={hero.images}
@@ -194,6 +208,10 @@ export function HomePage() {
               ref={(el) => {
                 sceneModels.current[i] = el;
               }}
+              spinRef={(h) => {
+                sceneSpins.current[i] = h;
+              }}
+              spin={p.spin}
               name={p.name}
               modelUrl={p.modelUrl}
               images={p.images}

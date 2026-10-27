@@ -7,6 +7,7 @@ import { api, prefersReducedMotion, useStoreSettings } from "../lib/api";
 import { useCart } from "../state/cart";
 import { ProductVisual, NoModel } from "../components/ProductVisual";
 import { ModelViewer } from "../components/ModelViewer";
+import { Spin360 } from "../components/Spin360";
 import { Price } from "../components/Price";
 import { SplitText } from "../components/SplitText";
 import { CubeIcon, MinusIcon, PlusIcon } from "../components/Icons";
@@ -27,7 +28,7 @@ export default function ProductPage() {
   const [colorId, setColorId] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
-  const [view, setView] = useState<"3d" | "photos">("3d");
+  const [view, setView] = useState<"3d" | "360" | "photos">("3d");
   const [imageIdx, setImageIdx] = useState(0);
   const [modelFailed, setModelFailed] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -43,8 +44,8 @@ export default function ProductPage() {
 
   useEffect(() => {
     if (!p) return;
-    setView(p.modelUrl && !modelFailed ? "3d" : "photos");
-  }, [p?.modelUrl, modelFailed]); // eslint-disable-line react-hooks/exhaustive-deps
+    setView(p.modelUrl && !modelFailed ? "3d" : p.spin.length > 0 ? "360" : "photos");
+  }, [p?.modelUrl, p?.spin.length, modelFailed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const variants = useMemo(() => (p ? p.variants.filter((v) => v.colorId === colorId) : []), [p, colorId]);
   const selected = variants.find((v) => v.id === variantId) ?? null;
@@ -96,6 +97,7 @@ export default function ProductPage() {
 
   const totalAvailable = p.variants.reduce((s, v) => s + v.available, 0);
   const hasModel = Boolean(p.modelUrl) && !modelFailed;
+  const hasSpin = p.spin.length > 0;
   const maxQty = Math.min(10, selected?.available ?? 1);
 
   async function onAdd() {
@@ -121,7 +123,7 @@ export default function ProductPage() {
       <div className="pdp">
         <section className="pdp__visual" aria-label="Visualización del producto">
           <div className="viewer">
-            {(hasModel || images.length > 0) && (
+            {(hasModel || hasSpin || images.length > 0) && (
               <div className="viewer__tabs" role="tablist">
                 {hasModel && (
                   <button
@@ -131,6 +133,16 @@ export default function ProductPage() {
                     onClick={() => setView("3d")}
                   >
                     <CubeIcon width={12} height={12} /> 3D
+                  </button>
+                )}
+                {hasSpin && (
+                  <button
+                    role="tab"
+                    aria-selected={view === "360"}
+                    className={`badge ${view === "360" ? "is-active" : ""}`}
+                    onClick={() => setView("360")}
+                  >
+                    360°
                   </button>
                 )}
                 {images.length > 0 && (
@@ -160,13 +172,18 @@ export default function ProductPage() {
                 />
                 <span className="viewer__hint eyebrow">Arrastra para girar · Pellizca o usa la rueda para acercar</span>
               </>
+            ) : view === "360" && hasSpin ? (
+              <>
+                <Spin360 frames={p.spin} alt={`Vista 360° de ${p.name}`} interactive autoPlay />
+                <span className="viewer__hint eyebrow">Arrastra para girar 360° · Doble clic para acercar</span>
+              </>
             ) : images[imageIdx] ? (
               <ProductVisual name={p.name} modelUrl={null} images={[images[imageIdx]]} />
             ) : (
               <NoModel name={p.name} />
             )}
           </div>
-          {!p.modelUrl && <p className="eyebrow">Este producto aún no tiene modelo 3D</p>}
+          {!p.modelUrl && !hasSpin && <p className="eyebrow">Este producto aún no tiene vista 3D ni 360°</p>}
           {modelFailed && <p className="eyebrow">No se pudo cargar el modelo 3D; se muestran las fotos</p>}
           {images.length > 1 && (
             <div className="thumbs">
