@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { SpinFrame } from "@tienda/shared";
-import { prefersReducedMotion } from "../lib/api";
+import { usePageVisible, useReducedMotion } from "../lib/motion";
 
 export interface SpinHandle {
   /** Muestra el fotograma que corresponde a un ángulo (grados). */
@@ -58,11 +58,14 @@ export const Spin360 = forwardRef<SpinHandle, Props>(function Spin360(
 
   const ready = loaded >= n;
 
+  // Giro automático: nunca con movimiento reducido ni con la pestaña oculta
+  const reduced = useReducedMotion();
+  const visible = usePageVisible();
   useEffect(() => {
-    if (!autoPlay || touched || !ready || prefersReducedMotion()) return;
+    if (!autoPlay || touched || !ready || reduced || !visible) return;
     const t = window.setInterval(() => setIndex((i) => (i + 1) % n), 110);
     return () => window.clearInterval(t);
-  }, [autoPlay, touched, ready, n]);
+  }, [autoPlay, touched, ready, reduced, visible, n]);
 
   const step = useCallback((delta: number) => setIndex((i) => (((i + delta) % n) + n) % n), [n]);
 

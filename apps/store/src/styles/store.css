@@ -189,6 +189,10 @@ model-viewer {
   background: transparent;
   --poster-color: transparent;
   --progress-bar-color: var(--accent);
+  /* superficie táctil: sin destello al tocar ni selección al mantener pulsado */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .visual--image img,
@@ -762,6 +766,100 @@ model-viewer {
   font-weight: 600;
 }
 
+.card__link {
+  display: grid;
+}
+
+/* El anillo de foco va en la tarjeta entera (el enlace queda recortado por overflow) */
+.card__link:focus-visible {
+  outline: none;
+}
+
+.card:has(> .card__link:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Vista previa 3D: el modelo real aparece sobre la foto con un fundido corto */
+.card__model {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+}
+
+.card__media.is-3d .card__model {
+  opacity: 1;
+}
+
+.card__media:has(.card__model) .card__img {
+  transition:
+    opacity 200ms var(--ease),
+    transform 0.6s var(--ease);
+}
+
+.card .card__media.is-3d .card__img,
+.card__media.is-3d .visual--empty {
+  opacity: 0;
+}
+
+.card__media .visual--empty {
+  transition: opacity 200ms var(--ease);
+}
+
+.card__3d {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  border-color: var(--cyan);
+  color: var(--cyan);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  transition:
+    opacity 150ms ease,
+    transform 120ms var(--ease),
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Área táctil de ~44 px sin cambiar el tamaño visible del botón */
+.card__3d::after {
+  content: "";
+  position: absolute;
+  inset: -11px -8px;
+}
+
+.card__3d:active {
+  transform: scale(0.97);
+}
+
+.card__3d.is-active {
+  background: var(--cyan);
+  color: var(--ink);
+}
+
+.card__3d-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Con mouse basta pasar por encima: el botón solo aparece al navegar con teclado */
+@media (hover: hover) and (pointer: fine) {
+  .card__3d:not(:focus-visible) {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
 /* ═══════════════════════ CATÁLOGO ═══════════════════════ */
 .catalog-hero {
   position: relative;
@@ -990,6 +1088,10 @@ model-viewer {
   padding: 8%;
 }
 
+.viewer model-viewer:focus-visible {
+  outline-offset: -3px;
+}
+
 .viewer__hint {
   position: absolute;
   left: 50%;
@@ -1000,6 +1102,26 @@ model-viewer {
   text-align: center;
   font-size: 10px;
   pointer-events: none;
+  transition: opacity 200ms var(--ease);
+}
+
+/* Desaparece tras el primer giro: ya se sabe que se puede mover */
+.viewer__hint.is-hidden {
+  opacity: 0;
+}
+
+/* En pantallas táctiles no hay rueda: el aviso habla de deslizar */
+.viewer__hint-touch {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .viewer__hint-pointer {
+    display: none;
+  }
+  .viewer__hint-touch {
+    display: inline;
+  }
 }
 
 .viewer__tabs {
@@ -1012,7 +1134,19 @@ model-viewer {
 }
 
 .viewer__tabs button {
+  position: relative;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Área táctil de ~44 px de alto sin cambiar el tamaño visible */
+.viewer__tabs button::after {
+  content: "";
+  position: absolute;
+  inset: -11px -3px;
 }
 
 .viewer__tabs .is-active {
@@ -1055,6 +1189,8 @@ model-viewer {
 
 .pdp__name {
   font-size: clamp(48px, 6vw, 92px);
+  /* un nombre con una palabra muy larga no debe ensanchar la página en el celular */
+  overflow-wrap: break-word;
 }
 
 .pdp__tagline {
@@ -1065,6 +1201,8 @@ model-viewer {
 
 .pdp__price {
   font-size: 26px;
+  /* con descuento, en pantallas de 320 px el precio anterior baja de línea */
+  flex-wrap: wrap;
 }
 
 .pdp__stock {
@@ -1182,7 +1320,7 @@ model-viewer {
 
 @media (max-width: 960px) {
   .pdp {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .pdp__visual {
     position: static;

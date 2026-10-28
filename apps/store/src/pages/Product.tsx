@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
@@ -31,6 +31,7 @@ export default function ProductPage() {
   const [view, setView] = useState<"3d" | "360" | "photos">("3d");
   const [imageIdx, setImageIdx] = useState(0);
   const [modelFailed, setModelFailed] = useState(false);
+  const [hintHidden, setHintHidden] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -64,6 +65,11 @@ export default function ProductPage() {
   }, [p, colorId]);
 
   useEffect(() => setImageIdx(0), [colorId]);
+
+  // Cada producto vuelve a mostrar el aviso "arrastra para girar"
+  useEffect(() => setHintHidden(false), [p?.id]);
+  const onModelError = useCallback(() => setModelFailed(true), []);
+  const onModelInteract = useCallback(() => setHintHidden(true), []);
 
   useLayoutEffect(() => {
     if (!p || !root.current || prefersReducedMotion()) return;
@@ -161,6 +167,7 @@ export default function ProductPage() {
             {view === "3d" && hasModel ? (
               <>
                 <ModelViewer
+                  key={p.modelUrl}
                   src={p.modelUrl!}
                   alt={`Modelo 3D de ${p.name}`}
                   poster={images[0]?.url}
@@ -168,9 +175,13 @@ export default function ProductPage() {
                   autoRotate
                   cameraOrbit="30deg 75deg auto"
                   className="visual"
-                  onError={() => setModelFailed(true)}
+                  onError={onModelError}
+                  onInteract={onModelInteract}
                 />
-                <span className="viewer__hint eyebrow">Arrastra para girar · Pellizca o usa la rueda para acercar</span>
+                <span className={`viewer__hint eyebrow ${hintHidden ? "is-hidden" : ""}`}>
+                  <span className="viewer__hint-pointer">Arrastra para girar · Pellizca o usa la rueda para acercar</span>
+                  <span className="viewer__hint-touch">Desliza para girar · Pellizca para acercar</span>
+                </span>
               </>
             ) : view === "360" && hasSpin ? (
               <>

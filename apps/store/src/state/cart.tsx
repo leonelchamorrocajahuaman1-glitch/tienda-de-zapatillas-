@@ -62,24 +62,37 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const [local, setLocal] = useState<LocalLine[]>(readLocal);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const merging = useRef(false);
+  const mergeInFlight = useRef(false);
+  const [mergeFailed, setMergeFailed] = useState(false);
+  // Mientras se fusiona el carrito de invitado no se pide el del servidor: una
+  // respuesta anterior a la fusión lo mostraría vacío (y el checkout, recién
+  // creada la cuenta, devolvería al cliente al carrito).
+  const merging = Boolean(user) && local.length > 0 && !mergeFailed;
+  // Las líneas a fusionar salen del estado (no de localStorage, que puede no estar disponible)
+  const localRef = useRef(local);
+  localRef.current = local;
 
   useEffect(() => writeLocal(local), [local]);
 
   // Fusiona el carrito de invitado al iniciar sesión
   useEffect(() => {
-    if (!user || merging.current) return;
-    const pending = readLocal();
+    if (!user) {
+      setMergeFailed(false);
+      return;
+    }
+    if (mergeInFlight.current) return;
+    const pending = localRef.current;
     if (pending.length === 0) return;
-    merging.current = true;
+    mergeInFlight.current = true;
     api
       .post<CartSummary>("/api/cart/merge", { items: pending })
       .then((summary) => {
-        setLocal([]);
         qc.setQueryData(["cart", user.id], summary);
+        setLocal([]);
       })
+      .catch(() => setMergeFailed(true))
       .finally(() => {
-        merging.current = false;
+        mergeInFlight.current = false;
       });
   }, [user, qc]);
 
@@ -91,7 +104,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         : local.length
           ? api.post<CartSummary>("/api/cart/quote", { items: local })
           : Promise.resolve(EMPTY),
-    enabled: !authLoading,
+    enabled: !authLoading && !merging,
     placeholderData: (prev) => prev,
     refetchInterval: 60_000,
   });

@@ -183,6 +183,8 @@ En la ficha del producto, la tienda muestra primero el modelo 3D (si existe), de
 - Desde **Panel → Producto → Modelo 3D** se sube un `.glb` (recomendado) o un `.gltf` con las texturas incrustadas, de hasta 60 MB. No hace falta tocar el código.
 - Si un producto no tiene modelo, o si el modelo falla al cargar, la tienda muestra su vista 360° o sus fotos. Si tampoco tiene fotos, muestra una silueta rotulada "Modelo 3D no disponible". **Nunca se inventa un modelo.**
 - En la portada, el modelo de cada producto destacado gira según el scroll.
+- En la ficha del producto, el modelo gira solo y despacio (una vuelta cada 30 s). Se detiene en cuanto el cliente lo mueve y vuelve a girar 3 s después de soltarlo. No gira solo si el sistema tiene activado "reducir movimiento" (el control manual sigue disponible) ni mientras la pestaña está oculta. En el celular, deslizar en vertical sobre el modelo mueve la página; en horizontal, gira la zapatilla.
+- En el catálogo, las tarjetas de productos con modelo lo muestran girando al pasar el mouse por encima (en el celular, con el botón "Ver 3D"). Solo hay un visor activo a la vez, y se apaga al salir de la pantalla. Los productos sin modelo muestran sus fotos como siempre.
 - **Cómo conseguir un modelo 3D de tus zapatillas reales:** con una app de escaneo 3D para celular que exporte `.glb` (por ejemplo Polycam o KIRI Engine). Rodeas la zapatilla grabando o tomando fotos y la app genera el modelo. Revisa que se vea bien y súbelo en el panel.
 - Exporta los modelos con origen centrado y escala real. Si usan compresión Draco/KTX2, el visor descarga sus decodificadores desde `www.gstatic.com`.
 

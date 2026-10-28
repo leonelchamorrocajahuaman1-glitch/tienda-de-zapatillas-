@@ -61,9 +61,13 @@ export const ProductVisual = forwardRef<HTMLElement, Props>(function ProductVisu
   return <NoModel name={name} className={className} />;
 });
 
-export function NoModel({ name, className }: { name: string; className?: string }) {
+export function NoModel({ name, className, label }: { name: string; className?: string; label?: string }) {
   return (
-    <div className={`visual visual--empty ${className ?? ""}`} role="img" aria-label={`${name}: sin imagen ni modelo 3D`}>
+    <div
+      className={`visual visual--empty ${className ?? ""}`}
+      role="img"
+      aria-label={`${name}: ${label ? label.toLowerCase() : "sin imagen ni modelo 3D"}`}
+    >
       <svg viewBox="0 0 200 90" aria-hidden>
         <path
           d="M8 70c22 0 38-8 54-26l14 8c14 8 34 12 60 12 22 0 46 4 58 12v8H8z"
@@ -73,7 +77,7 @@ export function NoModel({ name, className }: { name: string; className?: string 
           strokeDasharray="4 4"
         />
       </svg>
-      <span className="eyebrow">Modelo 3D no disponible</span>
+      <span className="eyebrow">{label ?? "Modelo 3D no disponible"}</span>
     </div>
   );
 }
