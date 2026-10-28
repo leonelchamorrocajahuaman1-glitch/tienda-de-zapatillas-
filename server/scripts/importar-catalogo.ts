@@ -15,7 +15,7 @@ import path from "node:path";
 import { z } from "zod";
 import { prisma } from "../src/db";
 import { slugify } from "../src/lib/slug";
-import { imageMime, modelMime, removeByUrl, saveFile } from "../src/storage/uploads";
+import { imageMime, modelMime, readStoredFile, removeByUrl, saveFile } from "../src/storage/uploads";
 
 const CATALOG_DIR = path.resolve(__dirname, "../catalog");
 const IMAGES_DIR = path.join(CATALOG_DIR, "imagenes");
@@ -93,12 +93,12 @@ async function refreshCatalogImages(productId: string, fileNames: string[]): Pro
   for (const image of images) {
     const id = image.url.match(/^\/uploads\/([a-z0-9]+)/i)?.[1];
     if (!id) continue;
-    const stored = await prisma.storedFile.findUnique({ where: { id }, select: { fileName: true, data: true } });
+    const stored = await readStoredFile(id);
     if (!stored || !fileNames.includes(stored.fileName)) continue;
     const source = path.join(IMAGES_DIR, stored.fileName);
     if (!fs.existsSync(source)) continue;
     const data = fs.readFileSync(source);
-    if (Buffer.from(stored.data).equals(data)) continue;
+    if (stored.data.equals(data)) continue;
     const url = await saveFile("image", data, imageMime(data), stored.fileName);
     await prisma.productImage.update({ where: { id: image.id }, data: { url } });
     // Los pedidos antiguos conservan su foto original

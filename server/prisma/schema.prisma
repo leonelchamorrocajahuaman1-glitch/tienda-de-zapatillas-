@@ -335,13 +335,26 @@ model OrderStatusHistory {
 // igual en tu PC y en un hosting sin disco permanente, y una copia de
 // seguridad de la base incluye también los archivos.
 model StoredFile {
-  id        String   @id @default(cuid())
+  id        String            @id @default(cuid())
   kind      String // "image" | "model"
   mimeType  String
   fileName  String
   size      Int
-  data      Bytes
-  createdAt DateTime @default(now())
+  data      Bytes // archivos pequeños: el contenido completo; si va en trozos, vacío
+  chunks    Int               @default(0) // nº de trozos en StoredFileChunk (0 = está en "data")
+  parts     StoredFileChunk[]
+  createdAt DateTime          @default(now())
+}
+
+// Archivos grandes (modelos 3D) en trozos de 2 MB: guardarlos y servirlos de una
+// sola vez multiplicaba la memoria del servidor y lo tumbaba en Render (512 MB).
+model StoredFileChunk {
+  fileId String
+  index  Int
+  data   Bytes
+  file   StoredFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, index])
 }
 
 // ─────────────────────────── Boletas e impresión ───────────────────────────

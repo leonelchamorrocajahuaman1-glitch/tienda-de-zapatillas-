@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatMoney, type ProductStatus } from "@tienda/shared";
 import { api } from "../lib/api";
 import { ProductPill } from "../components/Pill";
+import { ModelBulkUpload } from "../components/ModelBulkUpload";
 
 interface Row {
   id: string;
@@ -27,12 +28,19 @@ export function ProductsPage() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
+  const [uploadingModels, setUploadingModels] = useState(false);
   const params = new URLSearchParams();
   if (q.trim()) params.set("q", q.trim());
   if (status) params.set("status", status);
   const { data, isLoading } = useQuery({
     queryKey: ["admin-products", params.toString()],
     queryFn: () => api.get<Row[]>(`/api/admin/products?${params}`),
+  });
+  // Todas las zapatillas (sin filtros) para asignarles los modelos 3D
+  const all = useQuery({
+    queryKey: ["admin-products", ""],
+    queryFn: () => api.get<Row[]>("/api/admin/products?"),
+    enabled: uploadingModels,
   });
 
   return (
@@ -42,10 +50,16 @@ export function ProductsPage() {
           <div className="label">Catálogo</div>
           <h1 className="display">Productos</h1>
         </div>
-        <Link to="/productos/nuevo" className="btn btn--primary">
-          + Nueva zapatilla
-        </Link>
+        <div className="page-head__actions">
+          <button className="btn" onClick={() => setUploadingModels(true)}>
+            Subir modelos 3D
+          </button>
+          <Link to="/productos/nuevo" className="btn btn--primary">
+            + Nueva zapatilla
+          </Link>
+        </div>
       </div>
+      {uploadingModels && all.data && <ModelBulkUpload products={all.data} onClose={() => setUploadingModels(false)} />}
       <div className="toolbar">
         <input className="input" placeholder="Buscar por nombre, marca o SKU…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>

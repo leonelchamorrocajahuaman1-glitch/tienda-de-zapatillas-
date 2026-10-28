@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { PNG } from "pngjs";
-import { prisma } from "../db";
+import { readStoredFile } from "../storage/uploads";
 import { dotsFor, type Raster } from "./escpos";
 
 /**
@@ -15,8 +15,8 @@ const cache = new Map<string, Raster>();
 async function logoBytes(logoUrl: string | null): Promise<Buffer> {
   const id = logoUrl?.match(/^\/uploads\/([a-z0-9]+)/i)?.[1];
   if (id) {
-    const file = await prisma.storedFile.findUnique({ where: { id }, select: { data: true } });
-    if (file) return Buffer.from(file.data);
+    const file = await readStoredFile(id);
+    if (file) return file.data;
   }
   return fs.readFileSync(DEFAULT_LOGO);
 }

@@ -846,7 +846,8 @@ function ModelCard({ product, onSaved }: { product: Product; onSaved: (p: Produc
           <input ref={input} type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" onChange={(e) => upload(e.target.files?.[0])} />
           <strong>{uploading ? "Subiendo modelo…" : product.modelUrl ? "Reemplazar modelo 3D" : "Subir modelo 3D (.glb o .gltf)"}</strong>
           <span style={{ fontSize: 12 }}>
-            Máx. 60 MB. Usa .glb (un solo archivo con texturas). Un .gltf debe llevar texturas y buffers incrustados.
+            Un modelo por zapatilla, máx. 60 MB. Usa .glb (un solo archivo con texturas). Para subir los modelos de varias
+            zapatillas a la vez, usa Productos → Subir modelos 3D.
           </span>
         </label>
       </div>

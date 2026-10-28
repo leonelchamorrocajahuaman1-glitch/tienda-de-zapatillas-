@@ -180,7 +180,8 @@ En la ficha del producto, la tienda muestra primero el modelo 3D (si existe), de
 ## 8c. Modelos 3D
 
 - Visor: [`<model-viewer>`](https://modelviewer.dev). Permite girar el modelo con el mouse o el dedo y acercarlo con la rueda o pellizcando. Se carga solo cuando hace falta.
-- Desde **Panel → Producto → Modelo 3D** se sube un `.glb` (recomendado) o un `.gltf` con las texturas incrustadas, de hasta 60 MB. No hace falta tocar el código.
+- Desde **Panel → Producto → Modelo 3D** se sube un `.glb` (recomendado) o un `.gltf` con las texturas incrustadas, de hasta 60 MB. Cada zapatilla tiene un modelo; subir otro lo reemplaza. No hace falta tocar el código.
+- **Varias zapatillas a la vez:** en **Panel → Productos → Subir modelos 3D** eliges todos los `.glb` juntos. Cada archivo se asigna a la zapatilla con el nombre más parecido (`air-max-270.glb` → Air Max 270); revisas la lista, corriges lo que haga falta y se suben de uno en uno. Precios, stock y fotos no cambian.
 - Si un producto no tiene modelo, o si el modelo falla al cargar, la tienda muestra su vista 360° o sus fotos. Si tampoco tiene fotos, muestra una silueta rotulada "Modelo 3D no disponible". **Nunca se inventa un modelo.**
 - En la portada, el modelo de cada producto destacado gira según el scroll.
 - En la ficha del producto, el modelo gira solo y despacio (una vuelta cada 30 s). Se detiene en cuanto el cliente lo mueve y vuelve a girar 3 s después de soltarlo. No gira solo si el sistema tiene activado "reducir movimiento" (el control manual sigue disponible) ni mientras la pestaña está oculta. En el celular, deslizar en vertical sobre el modelo mueve la página; en horizontal, gira la zapatilla.
@@ -267,7 +268,7 @@ Para vender de verdad, cambia en Render el servicio y la base de datos a un plan
 ### Detalles técnicos
 
 - Un solo servicio de Node sirve la tienda en `/`, el panel en `/admin` y la API en `/api`.
-- Las imágenes y los modelos 3D se guardan **en la base de datos** (tabla `StoredFile`), así que no hace falta un disco permanente y una copia de la base incluye también los archivos.
+- Las imágenes y los modelos 3D se guardan **en la base de datos** (tabla `StoredFile`), así que no hace falta un disco permanente y una copia de la base incluye también los archivos. Los archivos de más de 2 MB se guardan y se sirven en trozos (`StoredFileChunk`). Así, subir un modelo de 45 MB usa menos de 300 MB de memoria, dentro de los 512 MB del plan gratuito de Render; antes pasaba de 800 MB y el servidor se reiniciaba.
 - Al arrancar (`npm run start:prod`) se aplican las migraciones, se crea el administrador si falta y se aplica el catálogo: con la base vacía lo importa entero; si ya hay productos, solo **completa** los existentes (precio, stock y publicación si aún no los tienen). No pisa lo que cambies en el panel ni vuelve a crear un producto que hayas borrado.
 - Los secretos de sesión los genera Render. HTTPS viene incluido, así que las cookies son `Secure`.
 - Para usar tu propio dominio (p. ej. `www.sole20.pe`): en Render, **Settings → Custom Domains**.

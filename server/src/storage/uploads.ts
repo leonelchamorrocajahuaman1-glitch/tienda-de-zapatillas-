@@ -8,7 +8,13 @@ import { badRequest } from "../lib/errors";
  * Almacenamiento de imágenes y modelos 3D en PostgreSQL (tabla StoredFile).
  * Se publican en /uploads/<id>.<ext> con caché permanente: un archivo nunca
  * cambia; si se reemplaza, se crea otro con otro id.
+ *
+ * Los archivos de más de 2 MB (modelos 3D) se guardan y se sirven en trozos:
+ * pasar un archivo de 40 MB de una sola vez por la base de datos ocupaba más
+ * de 800 MB de memoria y el servidor de Render (512 MB) se reiniciaba.
  */
+
+export const CHUNK_SIZE = 2 * 1024 * 1024;
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
 const MODEL_EXT = new Set([".glb", ".gltf"]);
@@ -107,11 +113,40 @@ const EXT_BY_MIME: Record<string, string> = {
 
 /** Guarda un archivo y devuelve su URL pública (/uploads/<id>.<ext>). */
 export async function saveFile(kind: "image" | "model", data: Buffer, mimeType: string, fileName: string) {
+  const small = data.length <= CHUNK_SIZE;
   const stored = await prisma.storedFile.create({
-    data: { kind, mimeType, fileName: fileName.slice(0, 200), size: data.length, data },
+    data: { kind, mimeType, fileName: fileName.slice(0, 200), size: data.length, data: small ? data : Buffer.alloc(0) },
     select: { id: true },
   });
+  if (!small) {
+    try {
+      let index = 0;
+      for (let offset = 0; offset < data.length; offset += CHUNK_SIZE, index++) {
+        await prisma.storedFileChunk.create({
+          data: { fileId: stored.id, index, data: data.subarray(offset, offset + CHUNK_SIZE) },
+        });
+      }
+      // El archivo solo se sirve cuando están guardados todos sus trozos
+      await prisma.storedFile.update({ where: { id: stored.id }, data: { chunks: index } });
+    } catch (err) {
+      await prisma.storedFile.deleteMany({ where: { id: stored.id } }).catch(() => undefined);
+      throw err;
+    }
+  }
   return `/uploads/${stored.id}${EXT_BY_MIME[mimeType] ?? ""}`;
+}
+
+/** Contenido completo de un archivo guardado (logos, importador). null si no existe o está incompleto. */
+export async function readStoredFile(id: string): Promise<{ fileName: string; data: Buffer } | null> {
+  const file = await prisma.storedFile.findUnique({
+    where: { id },
+    select: { fileName: true, size: true, chunks: true, data: true },
+  });
+  if (!file) return null;
+  if (file.chunks === 0) return file.data.length === file.size ? { fileName: file.fileName, data: Buffer.from(file.data) } : null;
+  const parts = await prisma.storedFileChunk.findMany({ where: { fileId: id }, orderBy: { index: "asc" } });
+  const data = Buffer.concat(parts.map((p) => p.data));
+  return parts.length === file.chunks && data.length === file.size ? { fileName: file.fileName, data } : null;
 }
 
 const idFromUrl = (url: string | null | undefined) => {
@@ -137,14 +172,42 @@ export async function serveUpload(req: Request, res: Response) {
     res.status(304).end();
     return;
   }
-  const file = await prisma.storedFile.findUnique({ where: { id }, select: { mimeType: true, data: true } });
-  if (!file) {
+  const file = await prisma.storedFile.findUnique({ where: { id }, select: { mimeType: true, size: true, chunks: true } });
+  // Sin trozos y sin contenido = subida a medias (no se sirve)
+  const inline =
+    file && file.chunks === 0
+      ? await prisma.storedFile.findUnique({ where: { id }, select: { data: true } })
+      : null;
+  if (!file || (file.chunks === 0 && inline?.data.length !== file.size)) {
     res.status(404).end();
     return;
   }
   res.setHeader("Content-Type", file.mimeType);
+  res.setHeader("Content-Length", String(file.size));
   res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   res.setHeader("ETag", `"${id}"`);
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.end(Buffer.from(file.data));
+  if (inline) {
+    res.end(Buffer.from(inline.data));
+    return;
+  }
+  // Trozo a trozo: en memoria nunca hay más de un trozo por descarga
+  for (let index = 0; index < file.chunks; index++) {
+    if (res.destroyed) return; // el cliente cerró la conexión
+    const part = await prisma.storedFileChunk.findUnique({
+      where: { fileId_index: { fileId: id, index } },
+      select: { data: true },
+    });
+    if (!part) {
+      res.destroy();
+      return;
+    }
+    if (!res.write(Buffer.from(part.data))) {
+      await new Promise<void>((resolve) => {
+        res.once("drain", resolve);
+        res.once("close", resolve);
+      });
+    }
+  }
+  res.end();
 }

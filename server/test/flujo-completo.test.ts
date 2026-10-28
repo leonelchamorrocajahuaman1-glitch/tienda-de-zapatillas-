@@ -148,6 +148,42 @@ run("Flujo completo tienda + panel sobre la misma base de datos", () => {
     expect(served.headers["content-type"]).toBe("model/gltf-binary");
   });
 
+  it("un modelo grande se guarda en trozos, se descarga idéntico y al reemplazarlo no deja restos", async () => {
+    // GLB válido de ~5,5 MB (cabecera + JSON + bloque binario de relleno)
+    const bin = Buffer.alloc(5.5 * 1024 * 1024);
+    for (let i = 0; i < bin.length; i += 4096) bin[i] = i % 251;
+    const small = minimalGlb();
+    const big = Buffer.concat([small, Buffer.from([bin.length & 0xff, (bin.length >> 8) & 0xff, (bin.length >> 16) & 0xff, bin.length >>> 24]), Buffer.from("BIN\0"), bin]);
+    big.writeUInt32LE(big.length, 8);
+
+    const up = await adminAgent
+      .post(`/api/admin/products/${productId}/model`)
+      .attach("model", big, { filename: "grande.glb", contentType: "model/gltf-binary" });
+    expect(up.status).toBe(201);
+    const id = up.body.modelUrl.match(/\/uploads\/([a-z0-9]+)/)[1];
+    expect(await prisma.storedFileChunk.count({ where: { fileId: id } })).toBe(3); // 2 + 2 + 1,5 MB
+
+    const served = await request(app)
+      .get(up.body.modelUrl)
+      .buffer(true)
+      .parse((res, cb) => {
+        const parts: Buffer[] = [];
+        res.on("data", (d: Buffer) => parts.push(d));
+        res.on("end", () => cb(null, Buffer.concat(parts)));
+      });
+    expect(served.status).toBe(200);
+    expect(served.headers["content-length"]).toBe(String(big.length));
+    expect(Buffer.compare(served.body as Buffer, big)).toBe(0);
+
+    // Se vuelve al modelo pequeño: el grande y sus trozos se borran
+    const back = await adminAgent
+      .post(`/api/admin/products/${productId}/model`)
+      .attach("model", small, { filename: "urban-x.glb", contentType: "model/gltf-binary" });
+    expect(back.status).toBe(201);
+    expect(await prisma.storedFile.count({ where: { id } })).toBe(0);
+    expect(await prisma.storedFileChunk.count({ where: { fileId: id } })).toBe(0);
+  });
+
   it("6-7. lo publica y aparece en el catálogo de la tienda", async () => {
     const before = await request(app).get("/api/catalog/products");
     expect(before.body.items).toHaveLength(0);
