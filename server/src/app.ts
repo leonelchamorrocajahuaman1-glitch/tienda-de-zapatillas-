@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { config } from "./config";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 import { serveUpload } from "./storage/uploads";
+import "./services/central-print"; // envía las boletas a la central de impresión si está activada
 import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/public/auth";
 import { cartRouter } from "./routes/public/cart";

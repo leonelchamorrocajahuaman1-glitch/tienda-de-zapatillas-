@@ -445,6 +445,7 @@ model PrintJob {
   printerLabel  String? // impresora usada
   error         String?
   retriedAt     DateTime? // ya se creó un reintento de este trabajo (evita duplicarlo)
+  externalRef   String? // referencia enviada a la central de impresión (la central no imprime dos veces la misma)
   requestedById String?
   createdAt     DateTime       @default(now())
   claimedAt     DateTime?

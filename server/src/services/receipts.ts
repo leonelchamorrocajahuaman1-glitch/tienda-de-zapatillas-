@@ -10,6 +10,7 @@ import {
   encodeEscPos,
   type Block,
   type Charset,
+  type Raster,
   type ReceiptSnapshot,
 } from "./escpos";
 import { loadLogoRaster } from "./receipt-logo";
@@ -193,6 +194,7 @@ export async function expireStalePrintJobs() {
 }
 
 export function printerLabel(s: ReceiptSettings) {
+  if (s.connection === "central") return "Central de impresión";
   if (s.connection === "network") return `Red ${s.networkHost ?? "?"}:${s.networkPort}`;
   return s.printerName || "Impresora predeterminada de Windows";
 }
@@ -202,44 +204,61 @@ export interface RenderedJob {
   documentName: string;
 }
 
-/** Genera los bytes ESC/POS de un trabajo con la configuración actual. */
-export async function renderJob(job: PrintJob): Promise<RenderedJob> {
-  const settings = await getSettings();
+export interface JobContent {
+  blocks: Block[];
+  cols: number;
+  documentName: string;
+  /** código de la boleta (null en la impresión de prueba) */
+  code: string | null;
+  copy: boolean;
+}
+
+/** Contenido de un trabajo con la configuración actual: para la impresora (ESC/POS) o solo texto (central). */
+export async function jobContent(
+  job: PrintJob,
+  settings: ReceiptSettings,
+  format: "escpos" | "text",
+): Promise<JobContent & { logo: Raster | null }> {
   const cols = columnsFor(settings.paperWidth);
-  const logo = settings.printLogo ? await loadLogoRaster(settings.logoUrl, settings.paperWidth) : null;
-  let blocks: Block[];
-  let documentName = "Prueba de impresión";
+  const logo = format === "escpos" && settings.printLogo ? await loadLogoRaster(settings.logoUrl, settings.paperWidth) : null;
 
   if (job.kind === "TEST") {
-    blocks = buildTestBlocks({
+    const blocks = buildTestBlocks({
       storeName: storeNameOf(settings),
       paperWidth: settings.paperWidth,
       printerLabel: printerLabel(settings),
       charset: settings.charset,
       printLogo: Boolean(logo),
       logoHasName: Boolean(logo) && !settings.logoUrl,
+      textOnly: format === "text",
     });
-  } else {
-    const receipt = await prisma.receipt.findUnique({
-      where: { id: job.receiptId ?? "" },
-      include: { order: { select: { paymentStatus: true, paymentMethod: true } } },
-    });
-    if (!receipt) throw notFound("Boleta no encontrada");
-    // Cualquier impresión posterior a una que ya salió bien es una COPIA
-    const alreadyPrinted = await prisma.printJob.count({
-      where: { receiptId: receipt.id, status: "PRINTED", id: { not: job.id } },
-    });
-    blocks = buildReceiptBlocks(receipt.snapshot as unknown as ReceiptSnapshot, {
-      cols,
-      printLogo: Boolean(logo),
-      logoHasName: Boolean(logo) && !settings.logoUrl,
-      copy: job.reason === "REPRINT" || alreadyPrinted > 0,
-      paymentStatusLabel: paymentStatusLabel(receipt.order),
-      voided: Boolean(receipt.voidedAt),
-    });
-    documentName = `Boleta ${receipt.code}`;
+    return { blocks, cols, documentName: "Prueba de impresión", code: null, copy: false, logo };
   }
+  const receipt = await prisma.receipt.findUnique({
+    where: { id: job.receiptId ?? "" },
+    include: { order: { select: { paymentStatus: true, paymentMethod: true } } },
+  });
+  if (!receipt) throw notFound("Boleta no encontrada");
+  // Cualquier impresión posterior a una que ya salió bien es una COPIA
+  const alreadyPrinted = await prisma.printJob.count({
+    where: { receiptId: receipt.id, status: "PRINTED", id: { not: job.id } },
+  });
+  const copy = job.reason === "REPRINT" || alreadyPrinted > 0;
+  const blocks = buildReceiptBlocks(receipt.snapshot as unknown as ReceiptSnapshot, {
+    cols,
+    printLogo: Boolean(logo),
+    logoHasName: Boolean(logo) && !settings.logoUrl,
+    copy,
+    paymentStatusLabel: paymentStatusLabel(receipt.order),
+    voided: Boolean(receipt.voidedAt),
+  });
+  return { blocks, cols, documentName: `Boleta ${receipt.code}`, code: receipt.code, copy, logo };
+}
 
+/** Genera los bytes ESC/POS de un trabajo con la configuración actual. */
+export async function renderJob(job: PrintJob): Promise<RenderedJob> {
+  const settings = await getSettings();
+  const { blocks, cols, documentName, logo } = await jobContent(job, settings, "escpos");
   const payload = encodeEscPos(blocks, {
     cols,
     charset: settings.charset as Charset,

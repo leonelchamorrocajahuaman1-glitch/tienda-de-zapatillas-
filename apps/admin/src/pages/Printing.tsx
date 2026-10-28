@@ -15,7 +15,7 @@ interface Settings {
   autoPrint: boolean;
   trigger: "ON_CONFIRMED" | "ON_PAID";
   paperWidth: 58 | 80;
-  connection: "windows" | "network";
+  connection: "windows" | "network" | "central";
   printerName: string | null;
   networkHost: string | null;
   networkPort: number;
@@ -33,6 +33,8 @@ interface Settings {
   legalNote: string;
   effectiveStoreName: string;
   printerLabel: string;
+  /** central de impresión externa: solo su dominio (null = sin configurar en el servidor) */
+  central?: { host: string | null };
 }
 
 interface AgentPrinter {
@@ -45,6 +47,8 @@ interface AgentPrinter {
 
 interface Status {
   printer: string;
+  connection: Settings["connection"];
+  central: { host: string | null };
   paperWidth: number;
   autoPrint: boolean;
   agents: {
@@ -206,29 +210,40 @@ function StatusTab({ onGo }: { onGo: (t: TabId) => void }) {
   if (isLoading || !data) return <div className="center"><div className="spinner" /></div>;
   const online = data.agents.filter((a) => a.online);
   const q = data.queue;
+  const central = data.connection === "central";
 
   return (
     <div className="stack">
-      {data.agents.length === 0 && (
+      {!central && data.agents.length === 0 && (
         <div className="alert alert--info">
           Para imprimir automáticamente necesitas el <strong>agente de impresión</strong> en la PC donde está la impresora.{" "}
           <button className="btn btn--sm" onClick={() => onGo("agente")}>Configurar agente</button>
         </div>
       )}
       <div className="stats">
-        <div className="card stat">
-          <span className="label">Agente</span>
-          <span className="stat__value" style={{ color: online.length ? "var(--ok)" : "var(--faint)" }}>
-            {online.length ? "En línea" : "Desconectado"}
-          </span>
-          <span className="stat__sub">
-            {online.length
-              ? online.map((a) => `${a.name}${a.hostname ? ` (${a.hostname})` : ""}`).join(", ")
-              : data.agents.length
-                ? `Última conexión: ${data.agents[0].lastSeenAt ? formatDate(data.agents[0].lastSeenAt, true) : "nunca"}`
-                : "Sin agentes"}
-          </span>
-        </div>
+        {central ? (
+          <div className="card stat">
+            <span className="label">Central de impresión</span>
+            <span className="stat__value" style={{ color: data.central.host ? "var(--ok)" : "var(--warn)" }}>
+              {data.central.host ? "Activa" : "Sin configurar"}
+            </span>
+            <span className="stat__sub">{data.central.host ?? "Faltan las variables CENTRAL_… en Render"}</span>
+          </div>
+        ) : (
+          <div className="card stat">
+            <span className="label">Agente</span>
+            <span className="stat__value" style={{ color: online.length ? "var(--ok)" : "var(--faint)" }}>
+              {online.length ? "En línea" : "Desconectado"}
+            </span>
+            <span className="stat__sub">
+              {online.length
+                ? online.map((a) => `${a.name}${a.hostname ? ` (${a.hostname})` : ""}`).join(", ")
+                : data.agents.length
+                  ? `Última conexión: ${data.agents[0].lastSeenAt ? formatDate(data.agents[0].lastSeenAt, true) : "nunca"}`
+                  : "Sin agentes"}
+            </span>
+          </div>
+        )}
         <div className="card stat">
           <span className="label">Impresora</span>
           <span className="stat__value" style={{ fontSize: 22 }}>{data.printer}</span>
@@ -251,7 +266,14 @@ function StatusTab({ onGo }: { onGo: (t: TabId) => void }) {
         </div>
       </div>
 
-      {(q.PENDING ?? 0) > 0 && online.length === 0 && (
+      {central && (
+        <div className="alert alert--info">
+          Las boletas se envían a la central de impresión y su agente de Windows las imprime. "Impresa" significa que la
+          central la recibió; si una no sale del papel, revísala en el panel de la central.
+        </div>
+      )}
+
+      {!central && (q.PENDING ?? 0) > 0 && online.length === 0 && (
         <div className="alert">
           Hay {q.PENDING} boleta(s) esperando, pero ningún agente está conectado. Abre <strong>iniciar-agente.bat</strong> en la
           PC de la impresora: se imprimirán al conectarse.
@@ -735,9 +757,28 @@ function SettingsTab() {
               <select className="select" value={form.connection} onChange={(e) => set("connection", e.target.value as Settings["connection"])}>
                 <option value="windows">Impresora instalada en Windows (USB / Bluetooth)</option>
                 <option value="network">Impresora de red (Ethernet / WiFi, IP)</option>
+                <option value="central" disabled={!settings.data?.central?.host && form.connection !== "central"}>
+                  Central de impresión (web externa){settings.data?.central?.host ? "" : " — falta configurar en Render"}
+                </option>
               </select>
             </div>
-            {form.connection === "windows" ? (
+            {form.connection === "central" ? (
+              <div className={`alert ${settings.data?.central?.host ? "alert--info" : ""}`}>
+                {settings.data?.central?.host ? (
+                  <>
+                    Cada boleta se envía a <span className="mono">{settings.data.central.host}</span> y la imprime el agente de
+                    Windows de la central. La central solo acepta texto: la boleta sale sin logo ni líneas gráficas. No hace
+                    falta el agente de esta tienda.
+                  </>
+                ) : (
+                  <>
+                    Para usar la central, agrega en Render (tu servicio → Environment) las variables{" "}
+                    <span className="mono">CENTRAL_PRINT_URL</span>, <span className="mono">CENTRAL_SITE_TOKEN</span> y{" "}
+                    <span className="mono">CENTRAL_SUBMIT_TOKEN</span>.
+                  </>
+                )}
+              </div>
+            ) : form.connection === "windows" ? (
               <div className="field">
                 <span className="label">Impresora</span>
                 <select className="select" value={form.printerName ?? ""} onChange={(e) => set("printerName", e.target.value || null)}>
@@ -771,7 +812,7 @@ function SettingsTab() {
                 </div>
               </div>
             )}
-            <div className="field">
+            {form.connection !== "central" && <div className="field">
               <span className="label">Agente que imprime</span>
               <select className="select" value={form.agentId ?? ""} onChange={(e) => set("agentId", e.target.value || null)}>
                 <option value="">Cualquier agente conectado</option>
@@ -779,7 +820,7 @@ function SettingsTab() {
                   <option key={a.id} value={a.id}>{a.name}{a.hostname ? ` (${a.hostname})` : ""}</option>
                 ))}
               </select>
-            </div>
+            </div>}
             <div className="field">
               <span className="label">Juego de caracteres (acentos y ñ)</span>
               <select className="select" value={form.charset} onChange={(e) => set("charset", e.target.value as Settings["charset"])}>

@@ -5,6 +5,7 @@
  *   TEST_DATABASE_URL=postgresql://.../tienda_zapatillas_test npm test
  */
 import { execSync } from "node:child_process";
+import http from "node:http";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
@@ -310,6 +311,121 @@ run("Boletas e impresión", () => {
     await admin.delete(`/api/admin/printing/agents/${agent.id}`);
     expect((await agentApi().heartbeat({})).status).toBe(401);
   });
+
+  it("central de impresión externa: envía texto con sus tokens, sin duplicar en reintentos", async () => {
+    // Central simulada: misma API que la real (POST /api/jobs, deduplica por source + external_id)
+    type Received = { headers: http.IncomingHttpHeaders; body: Record<string, unknown> };
+    const received: Received[] = [];
+    const stored = new Set<string>();
+    let mode: "ok" | "lost-response" | "unauthorized" = "ok";
+    const server = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (d) => (raw += d));
+      req.on("end", () => {
+        const body = JSON.parse(raw);
+        received.push({ headers: req.headers, body });
+        if (mode === "unauthorized") return void res.writeHead(401).end("token inválido");
+        const key = `${body.source}|${body.external_id}`;
+        const duplicate = stored.has(key);
+        stored.add(key);
+        if (mode === "lost-response") return void res.writeHead(503).end(); // la recibió, pero la respuesta se pierde
+        res.writeHead(duplicate ? 200 : 201, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ job: { id: `c${stored.size}`, status: "queued" }, duplicate }));
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const port = (server.address() as { port: number }).port;
+
+    const current = (await admin.get("/api/admin/printing/settings")).body;
+    const { id: _id, updatedAt: _u, logoUrl: _l, effectiveStoreName: _e, printerLabel: _p, central: _c, ...editable } = current;
+    const useCentral = { ...editable, enabled: true, autoPrint: true, trigger: "ON_CONFIRMED", connection: "central", paperWidth: 58, copies: 2 };
+
+    // Sin credenciales en el servidor no se puede activar
+    const missing = await admin.put("/api/admin/printing/settings").send(useCentral);
+    expect(missing.status).toBe(400);
+    expect(missing.body.error).toMatch(/CENTRAL_PRINT_URL/);
+
+    process.env.CENTRAL_PRINT_URL = `http://127.0.0.1:${port}/api/jobs`;
+    process.env.CENTRAL_SITE_TOKEN = "site-token-de-prueba";
+    process.env.CENTRAL_SUBMIT_TOKEN = "submit-token-de-prueba";
+    const waitJob = async (where: object) => {
+      for (let i = 0; i < 150; i++) {
+        const job = await prisma.printJob.findFirst({ where, orderBy: { createdAt: "desc" } });
+        if (job && (job.status === "PRINTED" || job.status === "FAILED")) return job;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      throw new Error("el trabajo no terminó");
+    };
+
+    try {
+      const saved = await admin.put("/api/admin/printing/settings").send(useCentral);
+      expect(saved.status).toBe(200);
+      expect(saved.body.central.host).toBe(`127.0.0.1:${port}`);
+      expect(JSON.stringify(saved.body)).not.toContain("token-de-prueba"); // los tokens no salen del servidor
+
+      // 1) Compra confirmada → se envía sola a la central
+      const order = await placeOrder();
+      await setStatus(order.id, "CONFIRMED");
+      const receipt = await prisma.receipt.findUniqueOrThrow({ where: { orderId: order.id } });
+      const first = await waitJob({ receiptId: receipt.id });
+      expect(first.status).toBe("PRINTED");
+      const sent = received.at(-1)!;
+      expect(sent.headers["oai-sites-authorization"]).toBe("Bearer site-token-de-prueba");
+      expect(sent.headers.authorization).toBe("Bearer submit-token-de-prueba");
+      expect(sent.body).toMatchObject({ external_id: receipt.code, title: `Boleta ${receipt.code}`, copies: 2 });
+      const content = String(sent.body.content);
+      expect(content).toContain(receipt.code);
+      expect(content).toContain("[ POR COBRAR ]");
+      expect(content).toMatch(/TOTAL +S\/ /);
+      expect(content).not.toMatch(/[\x00-\x09\x0b-\x1f]/); // solo texto, sin comandos ESC/POS
+      expect(content.split("\n").every((l) => l.length <= 32)).toBe(true); // papel de 58 mm
+
+      // 2) Reimpresión → referencia nueva (la central sí la imprime) y marcada como COPIA
+      await admin.post(`/api/admin/printing/receipts/${receipt.id}/reprint`);
+      const copy = await waitJob({ receiptId: receipt.id, reason: "REPRINT" });
+      expect(copy.status).toBe("PRINTED");
+      expect(received.at(-1)!.body.external_id).toMatch(new RegExp(`^${receipt.code}-COPIA-`));
+      expect(received.at(-1)!.body.title).toContain("(COPIA)");
+
+      // 3) La central recibe el comprobante pero la respuesta se pierde → FALLIDA (tras 3 intentos con la misma referencia)
+      mode = "lost-response";
+      const order2 = await placeOrder();
+      await setStatus(order2.id, "CONFIRMED");
+      const receipt2 = await prisma.receipt.findUniqueOrThrow({ where: { orderId: order2.id } });
+      const lost = await waitJob({ receiptId: receipt2.id });
+      expect(lost.status).toBe("FAILED");
+      expect(lost.error).toMatch(/Reintentar es seguro/);
+      expect(received.filter((r) => r.body.external_id === receipt2.code)).toHaveLength(3);
+      // …al reintentar se reenvía con la MISMA referencia: la central no la imprime otra vez
+      mode = "ok";
+      await admin.post(`/api/admin/printing/jobs/${lost.id}/retry`);
+      const retried = await waitJob({ receiptId: receipt2.id, reason: "RETRY" });
+      expect(retried.status).toBe("PRINTED");
+      expect(retried.printerLabel).toContain("ya estaba en la central");
+      expect([...stored].filter((k) => k.endsWith(`|${receipt2.code}`))).toHaveLength(1);
+
+      // 4) Credenciales rechazadas → FALLIDA con un mensaje claro, sin insistir
+      mode = "unauthorized";
+      const before = received.length;
+      expect((await admin.post("/api/admin/printing/test")).status).toBe(201);
+      const test = await waitJob({ kind: "TEST", status: { in: ["PRINTED", "FAILED"] }, createdAt: { gt: retried.createdAt } });
+      expect(test.status).toBe("FAILED");
+      expect(test.error).toMatch(/credenciales/);
+      expect(received.length - before).toBe(1);
+
+      // 5) Con la central activa, el agente propio no toma trabajos
+      const { token } = await downloadAgent("PC central");
+      await prisma.printJob.create({ data: { kind: "TEST", reason: "TEST", status: "PENDING" } });
+      mode = "ok";
+      expect((await agentApi(token).claim()).status).toBe(204);
+    } finally {
+      delete process.env.CENTRAL_PRINT_URL;
+      delete process.env.CENTRAL_SITE_TOKEN;
+      delete process.env.CENTRAL_SUBMIT_TOKEN;
+      await prisma.receiptSettings.update({ where: { id: 1 }, data: { connection: "windows" } });
+      server.close();
+    }
+  }, 60_000);
 });
 
 describe("ESC/POS", () => {

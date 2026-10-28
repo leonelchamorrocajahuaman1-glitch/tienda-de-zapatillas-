@@ -237,6 +237,8 @@ export function buildTestBlocks(info: {
   charset: string;
   printLogo: boolean;
   logoHasName?: boolean;
+  /** solo texto (central de impresión): sin la muestra de texto invertido ni separadores */
+  textOnly?: boolean;
 }): Block[] {
   const c = columnsFor(info.paperWidth);
   const b: Block[] = [];
@@ -258,13 +260,15 @@ export function buildTestBlocks(info: {
   b.push({ type: "text", text: "Doble", size: "double" });
   b.push({ type: "text", text: "Centrado", align: "center" });
   b.push({ type: "text", text: "Derecha", align: "right" });
-  b.push(stamp("TEXTO INVERTIDO"));
-  b.push({ type: "text", text: "Separadores:" });
-  b.push({ type: "rule", style: "solid" });
-  b.push({ type: "rule", style: "dashed" });
-  b.push({ type: "rule", style: "double" });
-  b.push({ type: "rule", style: "thick" });
-  b.push({ type: "text", text: "Si ves el texto invertido y las cuatro líneas, las boletas saldrán con su diseño completo.", align: "center" });
+  if (!info.textOnly) {
+    b.push(stamp("TEXTO INVERTIDO"));
+    b.push({ type: "text", text: "Separadores:" });
+    b.push({ type: "rule", style: "solid" });
+    b.push({ type: "rule", style: "dashed" });
+    b.push({ type: "rule", style: "double" });
+    b.push({ type: "rule", style: "thick" });
+    b.push({ type: "text", text: "Si ves el texto invertido y las cuatro líneas, las boletas saldrán con su diseño completo.", align: "center" });
+  }
   b.push({ type: "feed", lines: 1 });
   b.push({ type: "text", text: "La impresora está lista.", align: "center", bold: true });
   b.push({ type: "feed", lines: 1 });
@@ -301,6 +305,33 @@ export function previewLines(blocks: Block[], cols: number): PreviewLine[] {
     }
   }
   return out;
+}
+
+/**
+ * La boleta como texto plano de `cols` columnas (para la central de impresión,
+ * que solo acepta texto): sin logo; las líneas gráficas pasan a guiones o "=",
+ * y los sellos invertidos a [ TEXTO ].
+ */
+export function plainText(blocks: Block[], cols: number): string {
+  const out: string[] = [];
+  for (const l of previewLines(blocks, cols)) {
+    if (l.type === "logo") continue;
+    if (l.type === "blank") {
+      out.push("");
+      continue;
+    }
+    if (l.type === "rule") {
+      out.push((l.style === "double" || l.style === "thick" ? "=" : l.style === "dashed" ? "- " : "-").repeat(cols).slice(0, cols));
+      continue;
+    }
+    // Franjas a todo el ancho ya vienen maquetadas; un sello se marca con corchetes
+    const text = l.inverse && l.text.length < cols ? `[${l.text}]` : l.text;
+    const free = Math.max(0, cols - text.length);
+    const pad = l.align === "center" ? Math.floor(free / 2) : l.align === "right" ? free : 0;
+    out.push((" ".repeat(pad) + text).trimEnd());
+  }
+  while (out.length && out[out.length - 1] === "") out.pop();
+  return out.join("\n");
 }
 
 /** Separador como imagen de 1 bit a todo el ancho del papel. */

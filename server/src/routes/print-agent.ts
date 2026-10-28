@@ -90,8 +90,8 @@ printAgentRouter.post("/jobs/claim", async (req, res) => {
   for (let first = true; !closed && (first || Date.now() < deadline); first = false) {
     await expireStalePrintJobs();
     const settings = await getSettings();
-    if (settings.agentId && settings.agentId !== agent.id) {
-      // Otro agente está asignado a la impresora: este solo mantiene el latido.
+    if (settings.connection === "central" || (settings.agentId && settings.agentId !== agent.id)) {
+      // Imprime la central externa, u otro agente está asignado: este solo mantiene el latido.
       await sleep(5000);
       continue;
     }

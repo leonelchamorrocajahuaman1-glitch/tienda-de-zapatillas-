@@ -17,6 +17,7 @@ import {
   previewLines,
   type ReceiptSnapshot,
 } from "../../services/escpos";
+import { centralConfig, centralHost, dispatchCentral } from "../../services/central-print";
 import { clearLogoCache, loadLogoRaster, pngToRaster, rasterToPng } from "../../services/receipt-logo";
 import {
   expireStalePrintJobs,
@@ -39,7 +40,8 @@ const ONLINE_MS = 45_000;
 
 adminPrintingRouter.get("/settings", async (_req, res) => {
   const s = await getSettings();
-  res.json({ ...s, effectiveStoreName: storeNameOf(s), printerLabel: printerLabel(s) });
+  // Solo el dominio de la central: los tokens nunca salen del servidor
+  res.json({ ...s, effectiveStoreName: storeNameOf(s), printerLabel: printerLabel(s), central: { host: centralHost() } });
 });
 
 const settingsBody = z.object({
@@ -47,7 +49,7 @@ const settingsBody = z.object({
   autoPrint: z.boolean(),
   trigger: z.enum(["ON_CONFIRMED", "ON_PAID"]),
   paperWidth: z.union([z.literal(58), z.literal(80)]),
-  connection: z.enum(["windows", "network"]),
+  connection: z.enum(["windows", "network", "central"]),
   printerName: z.string().trim().max(200).nullable(),
   networkHost: z
     .string()
@@ -76,13 +78,19 @@ const settingsBody = z.object({
 adminPrintingRouter.put("/settings", async (req, res) => {
   const body = parse(settingsBody, req.body);
   if (body.connection === "network" && !body.networkHost) throw badRequest("Indica la IP de la impresora de red");
+  if (body.connection === "central" && !centralConfig()) {
+    throw badRequest(
+      "Falta configurar la central de impresión: agrega CENTRAL_PRINT_URL, CENTRAL_SITE_TOKEN y CENTRAL_SUBMIT_TOKEN en las variables de entorno de Render.",
+    );
+  }
   await getSettings();
   const s = await prisma.receiptSettings.update({
     where: { id: 1 },
     data: { ...body, printerName: body.printerName || null, networkHost: body.networkHost || null, storeName: body.storeName || null },
   });
   clearLogoCache();
-  res.json({ ...s, effectiveStoreName: storeNameOf(s), printerLabel: printerLabel(s) });
+  void dispatchCentral(); // si se acaba de activar la central, envía lo pendiente
+  res.json({ ...s, effectiveStoreName: storeNameOf(s), printerLabel: printerLabel(s), central: { host: centralHost() } });
 });
 
 /** Logo propio para la boleta (PNG; mejor en blanco y negro con fondo transparente o blanco). */
@@ -140,6 +148,8 @@ adminPrintingRouter.get("/status", async (_req, res) => {
   const now = Date.now();
   res.json({
     printer: printerLabel(settings),
+    connection: settings.connection,
+    central: { host: centralHost() },
     paperWidth: settings.paperWidth,
     autoPrint: settings.enabled && settings.autoPrint,
     agents: agents.map((a) => ({

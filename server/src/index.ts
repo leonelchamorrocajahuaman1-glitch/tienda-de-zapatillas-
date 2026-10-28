@@ -1,10 +1,12 @@
 import { config } from "./config";
 import { prisma } from "./db";
 import { createApp } from "./app";
+import { startCentralDispatcher } from "./services/central-print";
 
 async function main() {
   await prisma.$connect();
   const app = createApp();
+  startCentralDispatcher();
   app.listen(config.port, () => {
     console.log(`\n  API lista en http://localhost:${config.port}  (base de datos conectada)\n`);
   });

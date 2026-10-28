@@ -228,6 +228,18 @@ Impresora térmica USB (instalada en Windows) o de red (IP:9100)
 - Sin franjas negras → tu impresora no soporta texto invertido (la **Impresión de prueba** lo muestra en "TEXTO INVERTIDO"). La boleta sale con texto normal y se lee igual. Las líneas separadoras se imprimen como imagen, igual que el logo.
 - Respaldo sin agente: en cada boleta, **"Imprimir desde el navegador"** abre la ventana de impresión con el formato de 58/80 mm.
 
+**Usar una central de impresión externa (opcional)**
+
+En vez del agente de esta tienda, las boletas pueden enviarse a una central de impresión con API (`POST /api/jobs`), que las imprime con su propio agente de Windows.
+
+1. En Render → tu servicio → **Environment**, agrega `CENTRAL_PRINT_URL` (la dirección `…/api/jobs`), `CENTRAL_SITE_TOKEN` y `CENTRAL_SUBMIT_TOKEN`. Son secretos: solo van ahí, nunca en el código ni en GitHub. Render reinicia el servicio al guardarlas.
+2. **Panel → Boletas e impresión → Configuración → Conexión: "Central de impresión"**, papel de 58 u 80 mm según tu impresora, y guarda.
+3. Pulsa **Impresión de prueba**: debe aparecer en la cola de la central.
+
+- La central solo acepta texto: la boleta sale con el mismo contenido, pero sin logo, franjas negras ni líneas gráficas.
+- Cada boleta va con su número como referencia (`B001-00000001`). La central no imprime dos veces la misma referencia, así que **reintentar una boleta fallida es seguro**. Las reimpresiones llevan una referencia nueva y salen marcadas como COPIA.
+- "Impresa" en el panel significa que la central la recibió; el estado del papel se ve en el panel de la central.
+
 > Esta boleta es un comprobante interno de tu tienda. Para que tenga validez tributaria ante SUNAT necesitas emitir comprobantes electrónicos (SEE-SOL, OSE o PSE). Puedes poner tu RUC y una nota legal en la configuración.
 
 ## 9. Personalización

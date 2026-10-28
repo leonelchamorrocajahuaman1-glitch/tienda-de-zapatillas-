@@ -39,6 +39,14 @@ services:
         value: "1000"
       - key: FREE_SHIPPING_MIN_CENTS
         value: "30000"
+      # Central de impresión externa (opcional). Los valores se escriben en
+      # Render → servicio → Environment; nunca en este archivo.
+      - key: CENTRAL_PRINT_URL
+        sync: false
+      - key: CENTRAL_SITE_TOKEN
+        sync: false
+      - key: CENTRAL_SUBMIT_TOKEN
+        sync: false
 
 databases:
   - name: sole20-db
