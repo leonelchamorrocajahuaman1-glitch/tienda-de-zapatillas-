@@ -251,6 +251,14 @@ run("Boletas e impresión", () => {
         const max = line.size === "double" ? cols / 2 : cols;
         expect(line.text.length).toBeLessThanOrEqual(max);
       }
+      // Diseño: TOTAL en franja invertida de ancho completo, estado del pago como sello,
+      // separadores como líneas (no guiones de texto)
+      const total = prev.body.lines.find((l: { text?: string }) => l.text?.includes("TOTAL"));
+      expect(total).toMatchObject({ inverse: true, size: "tall" });
+      expect(total.text).toHaveLength(cols);
+      expect(prev.body.lines).toContainEqual(expect.objectContaining({ text: " POR COBRAR ", inverse: true }));
+      expect(prev.body.lines.some((l: { type: string }) => l.type === "rule")).toBe(true);
+      expect(prev.body.lines.some((l: { text?: string }) => l.text?.startsWith("-----"))).toBe(false);
     }
     const logo = await admin.get("/api/admin/printing/logo-preview.png?paperWidth=58");
     expect(logo.headers["content-type"]).toBe("image/png");
@@ -312,5 +320,33 @@ describe("ESC/POS", () => {
     expect(encodeText("Envío", "ascii").toString("ascii")).toBe("Envio");
     expect(wrap("Air Jordan 1 High OG Retro Chicago", 16).every((l) => l.length <= 16)).toBe(true);
     expect(row("TOTAL", "S/ 659.90", 32)).toHaveLength(32);
+  });
+
+  it("texto invertido y separadores como imagen a todo el ancho del papel", async () => {
+    const { encodeEscPos, ruleRaster, bar } = await import("../src/services/escpos");
+    for (const [cols, dots] of [
+      [32, 384],
+      [48, 576],
+    ]) {
+      const out = encodeEscPos(
+        [
+          { type: "text", text: bar("BOLETA DE VENTA", cols), inverse: true, bold: true },
+          { type: "rule", style: "dashed" },
+        ],
+        { cols, charset: "cp850", logo: null, cut: false, copies: 1 },
+      );
+      const bin = out.toString("latin1");
+      expect(bin).toContain("\x1dB\x01"); // invertido activado…
+      expect(bin).toContain("\x1dB\x00"); // …y desactivado después
+      expect(bin).not.toContain("-".repeat(cols)); // ya no hay guiones de texto
+      // GS v 0 con el ancho exacto del papel (bytes por fila = puntos / 8)
+      expect(bin).toContain(`\x1dv0\x00${String.fromCharCode(dots / 8)}\x00`);
+      for (const style of ["solid", "dashed", "double", "thick"] as const) {
+        const r = ruleRaster(style, dots);
+        expect(r.width).toBe(dots);
+        expect(r.data.length).toBe((dots / 8) * r.height);
+        expect(r.data.some((b) => b !== 0)).toBe(true);
+      }
+    }
   });
 });

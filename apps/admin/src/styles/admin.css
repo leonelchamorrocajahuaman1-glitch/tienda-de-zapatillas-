@@ -1025,6 +1025,32 @@ table.table {
   image-rendering: pixelated;
 }
 
+/* Texto invertido (blanco sobre negro), como lo imprime la térmica */
+.paper__ink {
+  background: #111;
+  color: #fbfaf7;
+}
+
+/* Separadores impresos como imagen: misma escala que el papel (1 punto ≈ 0,7 px) */
+.paper__rule {
+  height: 2px;
+  margin: 5px 0;
+  background: #111;
+}
+
+.paper__rule--thick {
+  height: 3px;
+}
+
+.paper__rule--dashed {
+  background: repeating-linear-gradient(90deg, #111 0 7px, transparent 7px 11.2px);
+}
+
+.paper__rule--double {
+  height: 5px;
+  background: linear-gradient(#111 0 1.5px, transparent 1.5px 3.5px, #111 3.5px);
+}
+
 .paper__cut {
   margin-top: 10px;
   padding-top: 6px;

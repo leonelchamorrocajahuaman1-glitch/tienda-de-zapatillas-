@@ -8,11 +8,14 @@
 
 export type Align = "left" | "center" | "right";
 export type TextSize = "normal" | "tall" | "double"; // tall = doble alto; double = doble alto y ancho
+/** Separadores: se imprimen como imagen (líneas continuas, iguales en cualquier impresora). */
+export type RuleStyle = "solid" | "dashed" | "double" | "thick";
 
 export type Block =
   | { type: "logo" }
-  | { type: "text"; text: string; align?: Align; bold?: boolean; size?: TextSize }
-  | { type: "rule" }
+  /** inverse = blanco sobre negro (si la impresora no lo soporta, sale texto normal) */
+  | { type: "text"; text: string; align?: Align; bold?: boolean; size?: TextSize; inverse?: boolean }
+  | { type: "rule"; style?: RuleStyle }
   | { type: "feed"; lines: number };
 
 export interface ReceiptItemSnapshot {
@@ -124,49 +127,101 @@ export function row(left: string, right: string, cols: number): string {
   return l + " ".repeat(Math.max(1, cols - l.length - right.length)) + right;
 }
 
+/** Texto centrado y rellenado con espacios hasta `width` (franja invertida de ancho completo). */
+export function bar(text: string, width: number): string {
+  const t = text.slice(0, width);
+  const left = Math.floor((width - t.length) / 2);
+  return " ".repeat(left) + t + " ".repeat(width - t.length - left);
+}
+
+/** Etiqueta y valor en una línea; si no caben juntos, el valor pasa a la línea siguiente. */
+function pair(label: string, value: string, cols: number): Block[] {
+  if (label.length + 1 + value.length <= cols) return [{ type: "text", text: row(label, value, cols) }];
+  return [
+    { type: "text", text: label },
+    { type: "text", text: value, align: "right" },
+  ];
+}
+
+/** Franja invertida con el texto centrado; si el texto es muy largo, texto en negrita normal. */
+function band(text: string, cols: number, size: TextSize = "normal"): Block {
+  const width = size === "double" ? Math.floor(cols / 2) : cols;
+  return text.length <= width - 2
+    ? { type: "text", text: bar(text, width), bold: true, size, inverse: true }
+    : { type: "text", text, align: "center", bold: true, size };
+}
+
+/** Sello invertido centrado (solo el texto, con un espacio de margen). */
+const stamp = (text: string, size: TextSize = "normal"): Block => ({
+  type: "text",
+  text: ` ${text} `,
+  align: "center",
+  bold: true,
+  size,
+  inverse: true,
+});
+
 // ───────────────────────── Contenido ─────────────────────────
 
 export function buildReceiptBlocks(s: ReceiptSnapshot, o: ReceiptRenderOptions): Block[] {
   const c = o.cols;
   const b: Block[] = [];
+
+  // Cabecera: logo, nombre y datos de la tienda
   if (o.printLogo) b.push({ type: "logo" });
   // El logo por defecto ya lleva el nombre: no se repite
   if (!o.logoHasName) b.push({ type: "text", text: s.storeName, align: "center", bold: true, size: o.printLogo ? "normal" : "double" });
   for (const line of s.headerLines) b.push({ type: "text", text: line, align: "center" });
-  b.push({ type: "rule" });
-  if (o.voided) b.push({ type: "text", text: "*** ANULADA ***", align: "center", bold: true, size: "tall" });
-  if (o.copy) b.push({ type: "text", text: "*** COPIA - REIMPRESION ***", align: "center", bold: true });
-  b.push({ type: "text", text: s.title, align: "center", bold: true });
-  b.push({ type: "text", text: s.code, align: "center", bold: true, size: "tall" });
   b.push({ type: "feed", lines: 1 });
-  b.push({ type: "text", text: row("Fecha:", formatLimaDate(s.issuedAt), c) });
-  b.push({ type: "text", text: row("Pedido:", `PED-${String(s.orderNumber).padStart(6, "0")}`, c) });
-  if (s.customerName) b.push({ type: "text", text: `Cliente: ${s.customerName}` });
-  b.push({ type: "rule" });
 
-  for (const it of s.items) {
-    const name =
-      it.brand && !it.name.toLowerCase().includes(it.brand.toLowerCase()) ? `${it.brand} ${it.name}` : it.name;
-    b.push({ type: "text", text: name, bold: true });
-    b.push({ type: "text", text: `  Talla ${it.size} · ${it.color}` });
-    b.push({ type: "text", text: row(`  ${it.quantity} x ${money(it.unitPriceCents)}`, money(it.lineTotalCents), c) });
-    if (it.discountPercent > 0) {
-      b.push({ type: "text", text: `  Antes ${money(it.unitListPriceCents)} (-${it.discountPercent}%)` });
-    }
-  }
-  b.push({ type: "rule" });
-  b.push({ type: "text", text: row("Subtotal", money(s.subtotalCents), c) });
-  if (s.discountCents > 0) b.push({ type: "text", text: row("Descuentos", money(-s.discountCents), c) });
-  b.push({ type: "text", text: row("Envío", s.shippingCents === 0 ? "Gratis" : money(s.shippingCents), c) });
-  b.push({ type: "text", text: row("TOTAL", money(s.totalCents), c), bold: true, size: "tall" });
-  b.push({ type: "rule" });
-  b.push({ type: "text", text: row("Pago:", s.paymentMethod, c) });
-  b.push({ type: "text", text: row("Estado del pago:", o.paymentStatusLabel, c), bold: true });
-  b.push({ type: "rule" });
+  // Tipo de comprobante y número
+  b.push(band(s.title, c));
+  b.push({ type: "text", text: s.code, align: "center", bold: true, size: "double" });
+  if (o.voided) b.push(band("ANULADA", c, "tall"));
+  if (o.copy) b.push(stamp("COPIA · REIMPRESIÓN"));
   b.push({ type: "feed", lines: 1 });
-  for (const line of s.footerMessage.split("\n").filter(Boolean)) {
-    b.push({ type: "text", text: line, align: "center", bold: true });
-  }
+
+  // Datos de la venta
+  b.push(...pair("FECHA", formatLimaDate(s.issuedAt), c));
+  b.push(...pair("PEDIDO", `PED-${String(s.orderNumber).padStart(6, "0")}`, c));
+  if (s.customerName) b.push(...pair("CLIENTE", s.customerName, c));
+  b.push({ type: "rule", style: "solid" });
+
+  // Productos
+  s.items.forEach((it, i) => {
+    if (i > 0) b.push({ type: "feed", lines: 1 });
+    const showBrand = it.brand && !it.name.toLowerCase().includes(it.brand.toLowerCase());
+    b.push({ type: "text", text: it.name, bold: true });
+    b.push({ type: "text", text: [showBrand ? it.brand : null, `Talla ${it.size}`, it.color].filter(Boolean).join(" · ") });
+    b.push({ type: "text", text: row(`${it.quantity} x ${money(it.unitPriceCents)}`, money(it.lineTotalCents), c) });
+    if (it.discountPercent > 0) {
+      b.push({ type: "text", text: `Precio regular ${money(it.unitListPriceCents)} · -${it.discountPercent}%` });
+    }
+  });
+  b.push({ type: "rule", style: "dashed" });
+
+  // Totales
+  const units = s.items.reduce((n, it) => n + it.quantity, 0);
+  const subtotalLabel = `Subtotal (${units} ${units === 1 ? "artículo" : "artículos"})`;
+  const subtotal = money(s.subtotalCents);
+  b.push(...pair(subtotalLabel.length + 1 + subtotal.length <= c ? subtotalLabel : "Subtotal", subtotal, c));
+  if (s.discountCents > 0) b.push(...pair("Descuentos", money(-s.discountCents), c));
+  b.push(...pair("Envío", s.shippingCents === 0 ? "Gratis" : money(s.shippingCents), c));
+  b.push({ type: "rule", style: "double" });
+  b.push({ type: "text", text: ` ${row("TOTAL", money(s.totalCents), c - 2)} `, bold: true, size: "tall", inverse: true });
+  b.push({ type: "feed", lines: 1 });
+
+  // Pago: método y, debajo, el estado como sello (POR COBRAR / PAGADO…)
+  b.push({ type: "text", text: s.paymentMethod, align: "center" });
+  b.push(stamp(o.paymentStatusLabel));
+  b.push({ type: "rule", style: "solid" });
+
+  // Despedida
+  s.footerMessage
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .forEach((line, i) => b.push({ type: "text", text: line, align: "center", bold: true, size: i === 0 ? "tall" : "normal" }));
   if (s.legalNote.trim()) {
     b.push({ type: "feed", lines: 1 });
     b.push({ type: "text", text: s.legalNote, align: "center" });
@@ -187,14 +242,14 @@ export function buildTestBlocks(info: {
   const b: Block[] = [];
   if (info.printLogo) b.push({ type: "logo" });
   if (!info.logoHasName) b.push({ type: "text", text: info.storeName, align: "center", bold: true, size: "double" });
-  b.push({ type: "rule" });
-  b.push({ type: "text", text: "IMPRESIÓN DE PRUEBA", align: "center", bold: true, size: "tall" });
   b.push({ type: "feed", lines: 1 });
-  b.push({ type: "text", text: row("Fecha:", formatLimaDate(new Date().toISOString()), c) });
-  b.push({ type: "text", text: row("Papel:", `${info.paperWidth} mm (${c} columnas)`, c) });
-  b.push({ type: "text", text: `Impresora: ${info.printerLabel}` });
-  b.push({ type: "text", text: row("Caracteres:", info.charset.toUpperCase(), c) });
-  b.push({ type: "rule" });
+  b.push(band("IMPRESIÓN DE PRUEBA", c));
+  b.push({ type: "feed", lines: 1 });
+  b.push(...pair("FECHA", formatLimaDate(new Date().toISOString()), c));
+  b.push(...pair("PAPEL", `${info.paperWidth} mm (${c} columnas)`, c));
+  b.push(...pair("IMPRESORA", info.printerLabel, c));
+  b.push(...pair("CARACTERES", info.charset.toUpperCase(), c));
+  b.push({ type: "rule", style: "solid" });
   b.push({ type: "text", text: "Acentos: áéíóú ÁÉÍÓÚ ñÑ ü ¿? ¡!" });
   b.push({ type: "text", text: "1234567890".repeat(Math.ceil(c / 10)).slice(0, c) });
   b.push({ type: "text", text: "Texto normal" });
@@ -203,8 +258,15 @@ export function buildTestBlocks(info: {
   b.push({ type: "text", text: "Doble", size: "double" });
   b.push({ type: "text", text: "Centrado", align: "center" });
   b.push({ type: "text", text: "Derecha", align: "right" });
-  b.push({ type: "rule" });
-  b.push({ type: "text", text: "Si lees esto, la impresora está lista.", align: "center" });
+  b.push(stamp("TEXTO INVERTIDO"));
+  b.push({ type: "text", text: "Separadores:" });
+  b.push({ type: "rule", style: "solid" });
+  b.push({ type: "rule", style: "dashed" });
+  b.push({ type: "rule", style: "double" });
+  b.push({ type: "rule", style: "thick" });
+  b.push({ type: "text", text: "Si ves el texto invertido y las cuatro líneas, las boletas saldrán con su diseño completo.", align: "center" });
+  b.push({ type: "feed", lines: 1 });
+  b.push({ type: "text", text: "La impresora está lista.", align: "center", bold: true });
   b.push({ type: "feed", lines: 1 });
   return b;
 }
@@ -213,7 +275,8 @@ export function buildTestBlocks(info: {
 
 export type PreviewLine =
   | { type: "logo" }
-  | { type: "text"; text: string; align: Align; bold: boolean; size: TextSize }
+  | { type: "text"; text: string; align: Align; bold: boolean; size: TextSize; inverse: boolean }
+  | { type: "rule"; style: RuleStyle }
   | { type: "blank" };
 
 /** Las líneas exactas que saldrán en el papel (para la vista previa del panel). */
@@ -221,16 +284,43 @@ export function previewLines(blocks: Block[], cols: number): PreviewLine[] {
   const out: PreviewLine[] = [];
   for (const blk of blocks) {
     if (blk.type === "logo") out.push({ type: "logo" });
-    else if (blk.type === "rule") out.push({ type: "text", text: "-".repeat(cols), align: "left", bold: false, size: "normal" });
+    else if (blk.type === "rule") out.push({ type: "rule", style: blk.style ?? "solid" });
     else if (blk.type === "feed") for (let i = 0; i < blk.lines; i++) out.push({ type: "blank" });
     else {
       const width = blk.size === "double" ? Math.floor(cols / 2) : cols;
       for (const line of wrap(blk.text, width)) {
-        out.push({ type: "text", text: line, align: blk.align ?? "left", bold: Boolean(blk.bold), size: blk.size ?? "normal" });
+        out.push({
+          type: "text",
+          text: line,
+          align: blk.align ?? "left",
+          bold: Boolean(blk.bold),
+          size: blk.size ?? "normal",
+          inverse: Boolean(blk.inverse),
+        });
       }
     }
   }
   return out;
+}
+
+/** Separador como imagen de 1 bit a todo el ancho del papel. */
+export function ruleRaster(style: RuleStyle, dots: number): Raster {
+  const pad = 7; // aire arriba y abajo de la línea
+  const strokes: number[][] =
+    style === "double" ? [[0, 2], [4, 6]] : style === "thick" ? [[0, 4]] : [[0, 2]];
+  const inkHeight = strokes[strokes.length - 1][1];
+  const height = pad * 2 + inkHeight;
+  const bytesPerRow = dots / 8;
+  const data = Buffer.alloc(bytesPerRow * height);
+  for (const [from, to] of strokes) {
+    for (let y = pad + from; y < pad + to; y++) {
+      for (let x = 0; x < dots; x++) {
+        if (style === "dashed" && x % 16 >= 10) continue; // trazos de 10 puntos, huecos de 6
+        data[y * bytesPerRow + (x >> 3)] |= 0x80 >> (x & 7);
+      }
+    }
+  }
+  return { width: dots, height, data };
 }
 
 // ───────────────────────── Codificación ESC/POS ─────────────────────────
@@ -297,6 +387,8 @@ const GS = 0x1d;
 
 export interface EncodeOptions {
   cols: number;
+  /** puntos por línea (por defecto 12 por columna: 576 en 80 mm, 384 en 58 mm) */
+  dots?: number;
   charset: Charset;
   logo: Raster | null;
   cut: boolean;
@@ -307,6 +399,16 @@ export function encodeEscPos(blocks: Block[], o: EncodeOptions): Buffer {
   const parts: Buffer[] = [];
   const push = (...bytes: number[]) => parts.push(Buffer.from(bytes));
   const align = (a: Align) => push(ESC, 0x61, a === "center" ? 1 : a === "right" ? 2 : 0);
+  const dots = o.dots ?? o.cols * 12;
+  // GS v 0: imagen en bloques de hasta 128 filas (compatible con más modelos)
+  const raster = (img: Raster) => {
+    const bytesPerRow = img.width / 8;
+    for (let y = 0; y < img.height; y += 128) {
+      const rows = Math.min(128, img.height - y);
+      push(GS, 0x76, 0x30, 0x00, bytesPerRow & 0xff, bytesPerRow >> 8, rows & 0xff, rows >> 8);
+      parts.push(img.data.subarray(y * bytesPerRow, (y + rows) * bytesPerRow));
+    }
+  };
 
   push(ESC, 0x40); // inicializar
   if (o.charset !== "ascii") push(ESC, 0x74, CODEPAGE[o.charset]);
@@ -315,17 +417,11 @@ export function encodeEscPos(blocks: Block[], o: EncodeOptions): Buffer {
     if (blk.type === "logo") {
       if (!o.logo) continue;
       align("center");
-      // GS v 0: imagen en bloques de hasta 128 filas (compatible con más modelos)
-      const bytesPerRow = o.logo.width / 8;
-      for (let y = 0; y < o.logo.height; y += 128) {
-        const rows = Math.min(128, o.logo.height - y);
-        push(GS, 0x76, 0x30, 0x00, bytesPerRow & 0xff, bytesPerRow >> 8, rows & 0xff, rows >> 8);
-        parts.push(o.logo.data.subarray(y * bytesPerRow, (y + rows) * bytesPerRow));
-      }
+      raster(o.logo);
       push(0x0a);
       align("left");
     } else if (blk.type === "rule") {
-      parts.push(Buffer.from(`${"-".repeat(o.cols)}\n`, "ascii"));
+      raster(ruleRaster(blk.style ?? "solid", dots));
     } else if (blk.type === "feed") {
       push(ESC, 0x64, blk.lines);
     } else {
@@ -333,12 +429,14 @@ export function encodeEscPos(blocks: Block[], o: EncodeOptions): Buffer {
       const width = size === "double" ? Math.floor(o.cols / 2) : o.cols;
       align(blk.align ?? "left");
       if (blk.bold) push(ESC, 0x45, 1);
+      if (blk.inverse) push(GS, 0x42, 1);
       if (size !== "normal") push(GS, 0x21, size === "double" ? 0x11 : 0x01);
       for (const line of wrap(blk.text, width)) {
         parts.push(encodeText(line, o.charset));
         push(0x0a);
       }
       if (size !== "normal") push(GS, 0x21, 0x00);
+      if (blk.inverse) push(GS, 0x42, 0);
       if (blk.bold) push(ESC, 0x45, 0);
       align("left");
     }

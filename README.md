@@ -192,6 +192,8 @@ En la ficha del producto, la tienda muestra primero el modelo 3D (si existe), de
 
 Cada compra confirmada genera una **boleta** (número único `B001-00000001`, `B001-00000002`…) y se imprime sola en tu impresora térmica de **58 mm u 80 mm**: logo, datos del cliente, productos, totales, método y estado del pago, mensaje de agradecimiento y corte de papel. Todo se gestiona en **Panel → Boletas e impresión**.
 
+**Diseño:** el título va en una franja negra con letras blancas y el número de boleta en letra grande. El **TOTAL** sale en una barra negra a todo el ancho y el estado del pago como sello (**POR COBRAR**, **PAGADO**…). Los separadores son líneas continuas, punteadas o dobles. La vista previa del panel muestra exactamente cómo saldrá.
+
 **Cómo funciona**
 
 ```
@@ -204,7 +206,7 @@ Impresora térmica USB (instalada en Windows) o de red (IP:9100)
 ```
 
 - Una página web **no puede imprimir sola** en una impresora: el **agente de impresión** es un pequeño programa (Node.js, sin dependencias) que corre en la PC de la impresora. Sirve tanto con la tienda en tu PC como publicada en Render, porque es el agente quien se conecta a la tienda.
-- **¿Cuándo se emite?** Por defecto, al confirmar el pedido; con pago contra entrega imprime **"Estado del pago: POR COBRAR"**. Si eliges "solo con pago verificado", la boleta se emite al marcar el pedido como Entregado (cobrado). Un pedido pendiente nunca genera boleta.
+- **¿Cuándo se emite?** Por defecto, al confirmar el pedido; con pago contra entrega lleva el sello **POR COBRAR**. Si eliges "solo con pago verificado", la boleta se emite al marcar el pedido como Entregado (cobrado). Un pedido pendiente nunca genera boleta.
 - **Sin duplicados:** una sola boleta por pedido (restricción única en la base de datos) y correlativo atómico. Cada trabajo de impresión lo toma un único agente. Un fallo **nunca se reimprime solo**: queda como *Fallida* y se reintenta a mano, una sola vez por fallo. Si se corta Internet justo después de imprimir, el agente vuelve a *avisar* del resultado pero no reimprime. Si el agente se apaga a mitad de impresión, el trabajo pasa a *Fallida* a los 2 minutos para que revises el papel antes de reintentar.
 - **Reimpresión:** desde la boleta o el pedido; sale marcada como **COPIA**.
 - **Si se cancela el pedido**, la boleta queda **ANULADA**.
@@ -222,6 +224,7 @@ Impresora térmica USB (instalada en Windows) o de red (IP:9100)
 - Acentos o ñ raros → cambia "Juego de caracteres" (CP850, WPC1252 o "Sin acentos").
 - "La impresora rechazó el documento" → el controlador no acepta datos RAW. Instala el controlador del fabricante (POS-58/POS-80) o el de Windows "Generic / Text Only".
 - No corta → tu modelo no tiene cortador: desactiva "Cortar papel".
+- Sin franjas negras → tu impresora no soporta texto invertido (la **Impresión de prueba** lo muestra en "TEXTO INVERTIDO"). La boleta sale con texto normal y se lee igual. Las líneas separadoras se imprimen como imagen, igual que el logo.
 - Respaldo sin agente: en cada boleta, **"Imprimir desde el navegador"** abre la ventana de impresión con el formato de 58/80 mm.
 
 > Esta boleta es un comprobante interno de tu tienda. Para que tenga validez tributaria ante SUNAT necesitas emitir comprobantes electrónicos (SEE-SOL, OSE o PSE). Puedes poner tu RUC y una nota legal en la configuración.
