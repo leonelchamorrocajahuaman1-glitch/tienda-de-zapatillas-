@@ -12,6 +12,7 @@ import { authRouter } from "./routes/public/auth";
 import { cartRouter } from "./routes/public/cart";
 import { catalogRouter } from "./routes/public/catalog";
 import { ordersRouter } from "./routes/public/orders";
+import { printAgentRouter } from "./routes/print-agent";
 
 export function createApp() {
   const app = express();
@@ -60,6 +61,9 @@ export function createApp() {
 
   // API privada del panel administrativo
   app.use("/api/admin", adminRouter);
+
+  // API del agente de impresión (programa de la PC de la tienda, token propio)
+  app.use("/api/print-agent", printAgentRouter);
 
   app.use("/api", notFoundHandler);
 

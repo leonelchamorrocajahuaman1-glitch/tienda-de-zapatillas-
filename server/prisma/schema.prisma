@@ -34,6 +34,7 @@ model User {
   statusChanges       OrderStatusHistory[]
   priceChanges        PriceHistory[]
   inventoryMovements  InventoryMovement[]
+  printRequests       PrintJob[]
 }
 
 // ─────────────────────────── Catálogo base ───────────────────────────
@@ -283,6 +284,7 @@ model Order {
   user          User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
   items         OrderItem[]
   statusHistory OrderStatusHistory[]
+  receipt       Receipt?
   movements     InventoryMovement[]
 
   @@index([userId, createdAt])
@@ -340,4 +342,120 @@ model StoredFile {
   size      Int
   data      Bytes
   createdAt DateTime @default(now())
+}
+
+// ─────────────────────────── Boletas e impresión ───────────────────────────
+
+enum ReceiptTrigger {
+  ON_CONFIRMED // al confirmar el pedido (stock descontado); el pago contra entrega figura "por cobrar"
+  ON_PAID // cuando el pago está verificado (pago contra entrega: al marcar Entregado)
+}
+
+enum PrintJobStatus {
+  PENDING // en cola, esperando al agente
+  PRINTING // el agente la tomó y está imprimiendo
+  PRINTED // impresa
+  FAILED // fallida (nunca se reintenta sola: se reintenta a mano desde el panel)
+  CANCELLED // cancelada (p. ej. pedido anulado antes de imprimir)
+}
+
+enum PrintJobKind {
+  RECEIPT
+  TEST
+}
+
+enum PrintJobReason {
+  AUTO // impresión automática al confirmar la compra
+  MANUAL // emitida/impresa a mano desde el panel
+  REPRINT // reimpresión (se marca como COPIA)
+  RETRY // reintento de una impresión fallida
+  TEST // página de prueba
+}
+
+// Configuración única (fila id = 1)
+model ReceiptSettings {
+  id            Int            @id @default(1)
+  enabled       Boolean        @default(true) // generar boletas
+  autoPrint     Boolean        @default(true) // enviarlas a la impresora automáticamente
+  trigger       ReceiptTrigger @default(ON_CONFIRMED)
+  paperWidth    Int            @default(80) // 58 | 80 (mm)
+  connection    String         @default("windows") // "windows" (impresora instalada) | "network" (IP:9100)
+  printerName   String?
+  networkHost   String?
+  networkPort   Int            @default(9100)
+  agentId       String? // agente que imprime; null = cualquier agente activo
+  charset       String         @default("cp850") // cp850 | cp1252 | ascii
+  cutPaper      Boolean        @default(true)
+  printLogo     Boolean        @default(true)
+  logoUrl       String? // logo propio (PNG); null = logo por defecto
+  copies        Int            @default(1)
+  storeName     String?
+  title         String         @default("BOLETA DE VENTA")
+  series        String         @default("B001")
+  headerLines   String         @default("") // RUC, dirección, teléfono… (una por línea)
+  footerMessage String         @default("¡Gracias por tu compra!")
+  legalNote     String         @default("")
+  updatedAt     DateTime       @updatedAt
+}
+
+// Correlativo por serie (B001 → 1, 2, 3…), incrementado dentro de la transacción
+model ReceiptSeries {
+  series String @id
+  last   Int    @default(0)
+}
+
+model Receipt {
+  id         String    @id @default(cuid())
+  code       String    @unique // B001-00000001
+  series     String
+  number     Int
+  orderId    String    @unique // una sola boleta por pedido
+  snapshot   Json // copia inmutable de lo vendido (para reimprimir idéntica)
+  issuedAt   DateTime  @default(now())
+  voidedAt   DateTime?
+  voidReason String?
+
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  printJobs PrintJob[]
+
+  @@unique([series, number])
+  @@index([issuedAt])
+}
+
+model PrintJob {
+  id            String         @id @default(cuid())
+  receiptId     String?
+  kind          PrintJobKind   @default(RECEIPT)
+  reason        PrintJobReason
+  status        PrintJobStatus @default(PENDING)
+  agentId       String?
+  printerLabel  String? // impresora usada
+  error         String?
+  retriedAt     DateTime? // ya se creó un reintento de este trabajo (evita duplicarlo)
+  requestedById String?
+  createdAt     DateTime       @default(now())
+  claimedAt     DateTime?
+  finishedAt    DateTime?
+
+  receipt     Receipt?    @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  agent       PrintAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  requestedBy User?       @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([receiptId])
+}
+
+// Programa instalado en la PC de la tienda que recibe los trabajos y los imprime
+model PrintAgent {
+  id         String    @id @default(cuid())
+  name       String
+  tokenHash  String    @unique // solo se guarda el hash del token
+  version    String?
+  hostname   String?
+  printers   Json? // impresoras que el agente ve en Windows
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  jobs PrintJob[]
 }

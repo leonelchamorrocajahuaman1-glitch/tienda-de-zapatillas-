@@ -13,6 +13,7 @@ import { TaxonomyPage } from "./pages/Taxonomy";
 import { SalesPage } from "./pages/Sales";
 import { InventoryPage } from "./pages/Inventory";
 import { AccountPage } from "./pages/Account";
+import { PrintingPage } from "./pages/Printing";
 
 export function App() {
   const { user, loading } = useAdminAuth();
@@ -39,6 +40,7 @@ export function App() {
         <Route path="clientes/:id" element={<CustomerDetailPage />} />
         <Route path="catalogo-base" element={<TaxonomyPage />} />
         <Route path="ventas" element={<SalesPage />} />
+        <Route path="boletas" element={<PrintingPage />} />
         <Route path="inventario" element={<InventoryPage />} />
         <Route path="cuenta" element={<AccountPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

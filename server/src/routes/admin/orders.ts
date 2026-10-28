@@ -60,6 +60,7 @@ adminOrdersRouter.get("/:id", async (req, res) => {
     include: {
       ...orderInclude,
       statusHistory: { orderBy: { createdAt: "asc" }, include: { changedBy: { select: { name: true, role: true } } } },
+      receipt: { include: { printJobs: { orderBy: { createdAt: "desc" }, take: 5 } } },
     },
   });
   if (!order) throw notFound("Pedido no encontrado");
@@ -74,6 +75,7 @@ adminOrdersRouter.patch("/:id/status", async (req, res) => {
     include: {
       ...orderInclude,
       statusHistory: { orderBy: { createdAt: "asc" }, include: { changedBy: { select: { name: true, role: true } } } },
+      receipt: { include: { printJobs: { orderBy: { createdAt: "desc" }, take: 5 } } },
     },
   });
   res.json({ ...order, allowedTransitions: ALLOWED_TRANSITIONS[order.status] });

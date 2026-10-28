@@ -46,5 +46,7 @@ export const config = {
   freeShippingMinCents: int("FREE_SHIPPING_MIN_CENTS", 30000),
   // Carpetas de las apps compiladas (se sirven en producción desde la misma API)
   storeDist: path.resolve(__dirname, "../../apps/store/dist"),
+  // Archivos del agente de impresión (se empaquetan desde el panel)
+  printAgentDir: path.resolve(__dirname, "../../print-agent"),
   adminDist: path.resolve(__dirname, "../../apps/admin/dist"),
 };

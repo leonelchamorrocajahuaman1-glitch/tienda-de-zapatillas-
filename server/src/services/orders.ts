@@ -5,6 +5,7 @@ import { finalPrice, shippingFor } from "../lib/pricing";
 import { getPaymentProvider } from "../payments";
 import { MAX_QTY_PER_LINE } from "./cart";
 import * as inventory from "./inventory";
+import { onOrderStatusChanged } from "./receipts";
 
 export interface ShippingInput {
   shippingName: string;
@@ -205,6 +206,10 @@ export async function changeOrderStatus(
     await tx.orderStatusHistory.create({
       data: { orderId: order.id, fromStatus: order.status, toStatus: to, note: note || null, changedById: actor.id },
     });
+
+    // Boleta de venta: se emite (y se manda a imprimir) en esta misma transacción,
+    // o se anula si el pedido se cancela.
+    await onOrderStatusChanged(tx, order.id, to, paymentStatus, actor.id);
 
     return tx.order.findUniqueOrThrow({ where: { id: order.id }, include: orderInclude });
   });

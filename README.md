@@ -186,6 +186,44 @@ En la ficha del producto, la tienda muestra primero el modelo 3D (si existe), de
 - **Cómo conseguir un modelo 3D de tus zapatillas reales:** con una app de escaneo 3D para celular que exporte `.glb` (por ejemplo Polycam o KIRI Engine). Rodeas la zapatilla grabando o tomando fotos y la app genera el modelo. Revisa que se vea bien y súbelo en el panel.
 - Exporta los modelos con origen centrado y escala real. Si usan compresión Draco/KTX2, el visor descarga sus decodificadores desde `www.gstatic.com`.
 
+## 8d. Boletas de venta e impresión térmica
+
+Cada compra confirmada genera una **boleta** (número único `B001-00000001`, `B001-00000002`…) y se imprime sola en tu impresora térmica de **58 mm u 80 mm**: logo, datos del cliente, productos, totales, método y estado del pago, mensaje de agradecimiento y corte de papel. Todo se gestiona en **Panel → Boletas e impresión**.
+
+**Cómo funciona**
+
+```
+Panel: "Confirmar pedido" ──► se emite la boleta (misma transacción) ──► cola de impresión
+                                                                              │
+PC de la tienda: agente de impresión ◄── pide trabajos (conexión saliente) ───┘
+        │ ESC/POS (sin ventanas)
+        ▼
+Impresora térmica USB (instalada en Windows) o de red (IP:9100)
+```
+
+- Una página web **no puede imprimir sola** en una impresora: el **agente de impresión** es un pequeño programa (Node.js, sin dependencias) que corre en la PC de la impresora. Sirve tanto con la tienda en tu PC como publicada en Render, porque es el agente quien se conecta a la tienda.
+- **¿Cuándo se emite?** Por defecto, al confirmar el pedido; con pago contra entrega imprime **"Estado del pago: POR COBRAR"**. Si eliges "solo con pago verificado", la boleta se emite al marcar el pedido como Entregado (cobrado). Un pedido pendiente nunca genera boleta.
+- **Sin duplicados:** una sola boleta por pedido (restricción única en la base de datos) y correlativo atómico. Cada trabajo de impresión lo toma un único agente. Un fallo **nunca se reimprime solo**: queda como *Fallida* y se reintenta a mano, una sola vez por fallo. Si se corta Internet justo después de imprimir, el agente vuelve a *avisar* del resultado pero no reimprime. Si el agente se apaga a mitad de impresión, el trabajo pasa a *Fallida* a los 2 minutos para que revises el papel antes de reintentar.
+- **Reimpresión:** desde la boleta o el pedido; sale marcada como **COPIA**.
+- **Si se cancela el pedido**, la boleta queda **ANULADA**.
+- **Estados de impresión:** Pendiente → Imprimiendo → Impresa / Fallida, con su historial: quién la pidió, qué impresora y qué error.
+- **Privacidad:** la boleta solo lleva el nombre del cliente (sin dirección, teléfono ni email). El agente usa un token propio que solo sirve para imprimir; en la base de datos se guarda únicamente su hash.
+
+**Instalación (una vez):**
+1. Instala **Node.js LTS** en la PC de la impresora e instala la impresora en Windows con su controlador (imprime una página de prueba de Windows).
+2. **Panel → Boletas e impresión → Agente de impresión → Descargar agente**. El ZIP ya trae la dirección de tu tienda y el token.
+3. Descomprímelo en `C:\AgenteBoletas` y abre `iniciar-agente.bat`. En el panel debe decir **"En línea"**.
+4. **Configuración:** elige la impresora (la lista viene de tu PC), el papel (58/80 mm) y el juego de caracteres. Guarda y pulsa **Impresión de prueba**.
+5. Opcional: `instalar-inicio-automatico.bat` para que el agente arranque al encender la PC.
+
+**Problemas frecuentes:**
+- Acentos o ñ raros → cambia "Juego de caracteres" (CP850, WPC1252 o "Sin acentos").
+- "La impresora rechazó el documento" → el controlador no acepta datos RAW. Instala el controlador del fabricante (POS-58/POS-80) o el de Windows "Generic / Text Only".
+- No corta → tu modelo no tiene cortador: desactiva "Cortar papel".
+- Respaldo sin agente: en cada boleta, **"Imprimir desde el navegador"** abre la ventana de impresión con el formato de 58/80 mm.
+
+> Esta boleta es un comprobante interno de tu tienda. Para que tenga validez tributaria ante SUNAT necesitas emitir comprobantes electrónicos (SEE-SOL, OSE o PSE). Puedes poner tu RUC y una nota legal en la configuración.
+
 ## 9. Personalización
 
 - **Nombre comercial:** crea `apps/store/.env` y `apps/admin/.env` con `VITE_STORE_NAME="Tu Marca"` (puedes partir de los `.env.example`).
@@ -266,6 +304,7 @@ server/
   prisma/    schema.prisma (base de datos única), migraciones y datos iniciales
   catalog/   productos.json + imagenes/ (catálogo importable)
   scripts/   importar-catalogo.ts
+  assets/    logo de la boleta por defecto
   src/
     routes/public/   catálogo, autenticación de clientes, carrito y pedidos
     routes/admin/    API privada del panel
@@ -273,6 +312,7 @@ server/
     payments/        punto de integración para pasarelas de pago
     storage/         subida y validación de imágenes y modelos 3D
   test/      prueba de extremo a extremo
+print-agent/         agente de impresión para Windows (se descarga ya configurado desde el panel)
 scripts/setup.mjs    asistente de instalación
 instalar.bat / iniciar.bat   accesos directos para Windows
 ```

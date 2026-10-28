@@ -960,3 +960,131 @@ table.table {
   height: 100%;
   object-fit: contain;
 }
+
+/* ─────────── Boletas e impresión ─────────── */
+.pill--print-PENDING { color: var(--warn); }
+.pill--print-PRINTING { color: var(--info); }
+.pill--print-PRINTED { color: var(--ok); }
+.pill--print-FAILED { color: #ff7676; }
+.pill--print-CANCELLED,
+.pill--print-NONE { color: var(--faint); }
+
+/* Papel térmico: mismas columnas que la impresora */
+.paper-wrap {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.paper {
+  --char: 8.4px;
+  width: calc(var(--cols) * var(--char) + 28px);
+  max-width: 100%;
+  padding: 18px 14px 10px;
+  background: #fbfaf7;
+  color: #111;
+  font-family: "JetBrains Mono", "Consolas", "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.32;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  overflow: hidden;
+  /* borde dentado inferior, como un ticket */
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 8px) no-repeat,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 90deg, #0000 91deg) bottom / 12px 8px repeat-x;
+  mask: linear-gradient(#000 0 0) top / 100% calc(100% - 8px) no-repeat,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 90deg, #0000 91deg) bottom / 12px 8px repeat-x;
+}
+
+.paper__line {
+  white-space: pre;
+  overflow: hidden;
+  font-size: calc(var(--char) * 1.66);
+  letter-spacing: 0;
+}
+
+.paper__line.is-bold {
+  font-weight: 700;
+}
+
+.paper__line--tall {
+  transform: scaleY(2);
+  transform-origin: top;
+  margin-bottom: 1.32em;
+}
+
+.paper__line--double {
+  font-size: calc(var(--char) * 3.32);
+  line-height: 1.2;
+}
+
+.paper__logo {
+  display: block;
+  margin: 0 auto 8px;
+  max-width: 55%;
+  image-rendering: pixelated;
+}
+
+.paper__cut {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed #bbb;
+  text-align: center;
+  color: #999;
+  font-size: 11px;
+}
+
+.logo-box {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border-radius: 10px;
+  background: #fbfaf7;
+}
+
+.logo-box img {
+  max-width: 260px;
+  image-rendering: pixelated;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.modal__panel {
+  position: relative;
+  width: min(980px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.receipt-modal {
+  display: grid;
+  grid-template-columns: auto minmax(240px, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .receipt-modal {
+    grid-template-columns: 1fr;
+  }
+}

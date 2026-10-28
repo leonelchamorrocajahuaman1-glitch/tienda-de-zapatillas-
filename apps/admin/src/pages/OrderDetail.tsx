@@ -15,8 +15,15 @@ import {
 import { api } from "../lib/api";
 import { OrderPill } from "../components/Pill";
 import { useToast } from "../components/Toast";
+import { PrintPill, ReceiptModal } from "./Printing";
 
 type AdminOrder = Order & {
+  receipt: {
+    id: string;
+    code: string;
+    voidedAt: string | null;
+    printJobs: { id: string; status: "PENDING" | "PRINTING" | "PRINTED" | "FAILED" | "CANCELLED"; error: string | null }[];
+  } | null;
   allowedTransitions: OrderStatus[];
   user: { id: string; name: string; email: string; phone: string | null };
 };
@@ -182,6 +189,8 @@ export function OrderDetailPage() {
             </div>
           </section>
 
+          <ReceiptCard order={o} />
+
           <section className="card">
             <div className="card__head"><h2>Cliente y entrega</h2></div>
             <div className="card__body">
@@ -201,5 +210,73 @@ export function OrderDetailPage() {
         </aside>
       </div>
     </>
+  );
+}
+
+/** Boleta del pedido: estado de impresión, vista previa y reimpresión. */
+function ReceiptCard({ order }: { order: AdminOrder }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const r = order.receipt;
+  const eligible = !["PENDING", "CANCELLED"].includes(order.status);
+
+  async function issue() {
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/printing/orders/${order.id}/receipt`, { print: true });
+      toast("Boleta emitida y enviada a la impresora");
+      qc.invalidateQueries({ queryKey: ["admin-order", order.id] });
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const last = r?.printJobs[0];
+  return (
+    <section className="card">
+      <div className="card__head">
+        <h2>Boleta de venta</h2>
+        {r && <PrintPill status={last?.status ?? "NONE"} />}
+      </div>
+      <div className="card__body form-grid">
+        {r ? (
+          <>
+            <div className="mono" style={{ fontSize: 18 }}>
+              {r.code} {r.voidedAt && <span className="tag">Anulada</span>}
+            </div>
+            {last?.status === "FAILED" && <div className="alert" style={{ fontSize: 13 }}>{last.error}</div>}
+            <button className="btn" onClick={() => setOpen(true)}>
+              Ver / reimprimir boleta
+            </button>
+          </>
+        ) : eligible ? (
+          <>
+            <p className="muted" style={{ margin: 0 }}>Este pedido aún no tiene boleta.</p>
+            <button className="btn btn--primary" onClick={issue} disabled={busy}>
+              {busy ? "Emitiendo…" : "Emitir e imprimir boleta"}
+            </button>
+          </>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>
+            {order.status === "PENDING"
+              ? "La boleta se emite al confirmar el pedido."
+              : "Pedido cancelado: no se emite boleta."}
+          </p>
+        )}
+      </div>
+      {open && r && (
+        <ReceiptModal
+          receiptId={r.id}
+          onClose={() => {
+            setOpen(false);
+            qc.invalidateQueries({ queryKey: ["admin-order", order.id] });
+          }}
+        />
+      )}
+    </section>
   );
 }

@@ -1,0 +1,49 @@
+AGENTE DE IMPRESION DE BOLETAS
+==============================
+
+Este programa imprime automaticamente las boletas de tu tienda en tu impresora
+termica (58 mm u 80 mm), sin abrir ventanas de impresion.
+
+REQUISITOS
+- Windows 10 u 11.
+- Node.js (version LTS): https://nodejs.org  (instalar con "Siguiente, siguiente").
+- Una impresora termica ESC/POS:
+    * USB: instalada en Windows con su controlador (debe aparecer en
+      Configuracion > Impresoras). Imprime una pagina de prueba de Windows primero.
+    * De red (Ethernet/WiFi): necesitas su IP (puerto 9100).
+
+PASOS
+1. Descomprime esta carpeta en un lugar fijo, por ejemplo C:\AgenteBoletas
+   (no la dejes en Descargas ni dentro del ZIP).
+2. Doble clic en  iniciar-agente.bat  y deja la ventana abierta (puedes minimizarla).
+   Debe decir: "Conectado como ...".
+3. En el panel de tu tienda: Boletas e impresion > Configuracion
+   - elige la impresora (aparece la lista de esta PC) y el papel (58 u 80 mm),
+   - pulsa "Guardar" y luego "Impresion de prueba".
+4. (Opcional) Doble clic en  instalar-inicio-automatico.bat  para que el agente
+   arranque solo al encender la PC.
+
+OTROS ARCHIVOS
+- listar-impresoras.bat     muestra las impresoras que ve el agente.
+- probar-impresora.bat      imprime un ticket sin pasar por la tienda.
+- quitar-inicio-automatico.bat
+- config.json               direccion de tu tienda y token del agente. Es secreto:
+                            no lo compartas. Si lo pierdes o lo filtras, revoca el
+                            agente en el panel y descarga uno nuevo.
+- agente.log                registro de lo que hace el agente.
+- registro-trabajos.json    boletas ya procesadas (evita imprimir dos veces).
+
+COMO FUNCIONA
+- El agente pregunta a tu tienda si hay boletas por imprimir. Cuando confirmas
+  un pedido en el panel, la boleta se imprime en pocos segundos.
+- Si la impresora falla (apagada, sin papel, desconectada) la boleta queda como
+  FALLIDA en el panel y NO se reimprime sola: revisa la impresora y pulsa
+  "Reintentar".
+- Si la PC estaba apagada, las boletas pendientes se imprimen al iniciar el agente.
+
+PROBLEMAS FRECUENTES
+- "Token rechazado": el agente fue revocado. Descarga uno nuevo desde el panel.
+- Salen simbolos raros en los acentos: en el panel cambia "Juego de caracteres"
+  (prueba CP850, luego WPC1252, o "Sin acentos").
+- No corta el papel: tu impresora no tiene cortador; desactiva "Cortar papel".
+- La impresora USB no aparece: instala su controlador de Windows y reinicia el agente.

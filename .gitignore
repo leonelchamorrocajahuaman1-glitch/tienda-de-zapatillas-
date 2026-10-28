@@ -3,3 +3,9 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Archivos del agente de impresión al ejecutarlo (contienen el token)
+print-agent/config.json
+print-agent/agente.log*
+print-agent/registro-trabajos.json*
+print-agent/imprimir-raw.ps1
