@@ -182,9 +182,16 @@ h3 {
 .sidebar__foot {
   margin-top: auto;
   display: grid;
+  /* la columna no crece con un correo largo: el botón queda dentro del menú */
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   padding: 12px;
   border-top: 1px solid var(--line);
+}
+
+.sidebar__user {
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .main {

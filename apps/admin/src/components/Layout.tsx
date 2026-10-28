@@ -61,7 +61,7 @@ export function Layout() {
           <a className="btn btn--sm" href={STORE_URL || "/"} target="_blank" rel="noreferrer">
             Ver tienda ↗
           </a>
-          <div className="muted" style={{ fontSize: 12 }}>
+          <div className="muted sidebar__user">
             {user?.name}
             <br />
             {user?.email}
