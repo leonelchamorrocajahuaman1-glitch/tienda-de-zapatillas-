@@ -9,3 +9,5 @@ print-agent/config.json
 print-agent/agente.log*
 print-agent/registro-trabajos.json*
 print-agent/imprimir-raw.ps1
+
+__pycache__/
