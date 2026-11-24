@@ -6,6 +6,9 @@ import { api, soles, STORE_URL } from "../lib/api";
 import { useToast } from "../components/Toast";
 import { ProductPill } from "../components/Pill";
 import { ModelPreview } from "../components/ModelPreview";
+import { dominantColor } from "../lib/color";
+
+const DEFAULT_ACCENT = "#ff2a2a";
 
 interface Ref {
   id: string;
@@ -126,6 +129,32 @@ export function ProductEditorPage() {
   };
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  const firstImage = p?.images[0]?.url;
+  async function pickColorFromPhoto() {
+    if (!firstImage) return;
+    try {
+      set("accentColor", await dominantColor(firstImage));
+      toast("Color tomado de la foto. Guarda los cambios para aplicarlo.");
+    } catch {
+      toast("No se pudo leer la foto", "error");
+    }
+  }
+
+  // Primera foto de una zapatilla con el color por defecto: su escena 3D toma el color de la foto
+  async function onImagesSaved(data: Product) {
+    setProduct(data);
+    const photo = data.images[0]?.url;
+    const hadPhotos = Boolean(p?.images.length);
+    if (!photo || hadPhotos || data.accentColor.toLowerCase() !== DEFAULT_ACCENT) return;
+    try {
+      const accentColor = await dominantColor(photo);
+      setProduct(await api.patch<Product>(`/api/admin/products/${data.id}`, { accentColor }));
+      toast("La escena 3D tomó el color de la foto");
+    } catch {
+      /* sin color automático: se queda el de por defecto */
+    }
+  }
 
   const finalPreview = useMemo(() => {
     const price = Number.parseFloat(form.price);
@@ -275,7 +304,19 @@ export function ProductEditorPage() {
                 </div>
               </div>
               <div className="cols-2">
-                {field("accentColor", "Color de luz en la escena 3D", <input id="accentColor" className="input" type="color" value={form.accentColor} onChange={(e) => set("accentColor", e.target.value)} style={{ padding: 4 }} />)}
+                {field(
+                  "accentColor",
+                  "Color de la escena 3D",
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input id="accentColor" className="input" type="color" value={form.accentColor} onChange={(e) => set("accentColor", e.target.value)} style={{ padding: 4 }} />
+                    {firstImage && (
+                      <button type="button" className="btn btn--sm" style={{ height: 40, whiteSpace: "nowrap" }} onClick={pickColorFromPhoto}>
+                        Tomar de la foto
+                      </button>
+                    )}
+                  </div>,
+                  "Tiñe el fondo, la luz y el brillo del visor 3D. Guarda para aplicarlo.",
+                )}
                 <label className="switch" style={{ alignSelf: "end", height: 40 }}>
                   <input type="checkbox" checked={form.featured} onChange={(e) => set("featured", e.target.checked)} />
                   Destacar en la portada cinematográfica
@@ -287,7 +328,7 @@ export function ProductEditorPage() {
           {p ? (
             <>
               <InventoryCard product={p} colors={colors.data ?? []} sizes={sizes.data ?? []} onSaved={setProduct} />
-              <ImagesCard product={p} colors={colors.data ?? []} onSaved={setProduct} />
+              <ImagesCard product={p} colors={colors.data ?? []} onSaved={onImagesSaved} />
               <SpinCard product={p} onSaved={setProduct} />
               <ModelCard product={p} onSaved={setProduct} />
             </>

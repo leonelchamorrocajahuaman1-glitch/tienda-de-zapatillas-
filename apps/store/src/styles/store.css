@@ -799,6 +799,27 @@ model-viewer {
     transform 0.6s var(--ease);
 }
 
+/* Con el 3D activo, la tarjeta se ilumina con el color de la zapatilla (mismo fundido que el modelo) */
+.card__media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 40% 12% at 50% 78%, color-mix(in srgb, var(--card-accent) 50%, transparent), transparent 70%),
+    radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--card-accent) 26%, #1d1d21), #0d0d0f 70%);
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+  pointer-events: none;
+}
+
+.card__media.is-3d::before {
+  opacity: 1;
+}
+
+.card__media.is-3d .card__glow {
+  opacity: 0.45;
+}
+
 .card .card__media.is-3d .card__img,
 .card__media.is-3d .visual--empty {
   opacity: 0;
@@ -1065,15 +1086,31 @@ model-viewer {
   gap: 12px;
 }
 
+/* Escenario teñido con el color de cada zapatilla (campo "Color de la escena 3D") */
 .viewer {
   position: relative;
   aspect-ratio: 4 / 3.4;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--accent-scene) 28%, var(--line));
   border-radius: var(--radius);
   overflow: hidden;
   background:
-    radial-gradient(ellipse 60% 50% at 50% 60%, color-mix(in srgb, var(--accent-scene) 25%, transparent), transparent 70%),
-    radial-gradient(circle at 50% 120%, #222, #0b0b0c 60%);
+    /* luz reflejada en el suelo, bajo la zapatilla */
+    radial-gradient(ellipse 42% 12% at 50% 80%, color-mix(in srgb, var(--accent-scene) 55%, transparent), transparent 70%),
+    /* foco que la ilumina desde arriba */
+    radial-gradient(ellipse 65% 55% at 50% 40%, color-mix(in srgb, var(--accent-scene) 30%, transparent), transparent 72%),
+    radial-gradient(circle at 50% 115%, color-mix(in srgb, var(--accent-scene) 22%, #141416), #0b0b0c 62%);
+  box-shadow: 0 30px 80px -40px color-mix(in srgb, var(--accent-scene) 45%, transparent);
+}
+
+/* Brillo del borde superior, del color de la zapatilla */
+.viewer::after {
+  content: "";
+  position: absolute;
+  inset: 0 12% auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent-scene) 80%, #fff), transparent);
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .viewer::before {
@@ -1086,6 +1123,11 @@ model-viewer {
 
 .viewer .visual--image img {
   padding: 8%;
+}
+
+/* La barra de carga del 3D, del color de la zapatilla */
+.viewer model-viewer {
+  --progress-bar-color: var(--accent-scene, var(--accent));
 }
 
 .viewer model-viewer:focus-visible {
