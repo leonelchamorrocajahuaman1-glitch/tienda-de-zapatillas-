@@ -28,8 +28,10 @@ Tienda online de zapatillas con experiencia cinematográfica en 3D y un sistema 
 | Programa | Versión | Descarga |
 |---|---|---|
 | Node.js | 20 o superior (LTS) | https://nodejs.org |
-| PostgreSQL | 14 o superior | https://www.postgresql.org/download/windows/ (anota la contraseña del usuario `postgres` que te pide el instalador) |
+| Base de datos: **XAMPP** (MySQL/MariaDB) **o** PostgreSQL | XAMPP 8 o superior · PostgreSQL 14 o superior | https://www.apachefriends.org (XAMPP) · https://www.postgresql.org/download/windows/ |
 | Git (opcional) | — | https://git-scm.com |
+
+> **Con XAMPP** solo se usa su **MySQL** (la base que ves en phpMyAdmin): ábrelo en el *XAMPP Control Panel* y pulsa **Start** en MySQL. La tienda, el panel y la API los ejecuta Node.js; Apache no hace falta. Todo funciona igual que con PostgreSQL. Ver la sección "XAMPP".
 
 > Alternativa a instalar PostgreSQL: con **Docker Desktop** ejecuta `docker compose up -d` en la carpeta del proyecto (usuario `postgres`, contraseña `postgres`).
 
@@ -44,7 +46,7 @@ npm run setup
 ```
 
 El asistente:
-1. Te pregunta los datos de PostgreSQL y el email y la contraseña del administrador.
+1. Te pregunta qué base de datos usas (**1 = XAMPP**, 2 = PostgreSQL), sus datos (con XAMPP basta pulsar Enter: usuario `root` sin contraseña, base `sole20`) y el email y la contraseña del administrador.
 2. Crea `server/.env` con secretos aleatorios para las sesiones.
 3. Instala las dependencias (`npm install`).
 4. **Crea la base de datos y aplica las migraciones** (`prisma migrate deploy`).
@@ -62,6 +64,35 @@ npm run db:deploy                          # crea la base y aplica las migracion
 npm run db:seed                            # administrador + tallas, colores, categorías y marcas
 ```
 </details>
+
+## 2b. XAMPP (MySQL / MariaDB) y copias de seguridad
+
+La tienda funciona igual con la base **MySQL de XAMPP** que con PostgreSQL (Render): mismas pantallas, pedidos, inventario, boletas, fotos y modelos 3D. Las 33 pruebas automáticas pasan con los dos motores.
+
+**Instalar con XAMPP**
+1. Instala **XAMPP** y **Node.js LTS**. En el *XAMPP Control Panel*, pulsa **Start** en **MySQL**.
+2. Doble clic en **`instalar.bat`** y elige **1 (XAMPP)**. Pulsa Enter en usuario, contraseña, host, puerto y nombre de la base (`sole20`). Crea la base sola.
+3. Doble clic en **`iniciar.bat`**. En phpMyAdmin (http://localhost/phpmyadmin) verás la base `sole20` con sus tablas.
+
+**Traer tus datos de Render (sin perder nada)**
+1. En tu panel de Render (`…onrender.com/admin`) → **Mi cuenta → Descargar copia de seguridad**. Descarga un archivo `sole20-copia-….jsonl.gz` con **todo**: productos, precios, stock, clientes y sus contraseñas, pedidos, boletas y numeración, fotos y modelos 3D.
+2. En tu PC (con MySQL iniciado en XAMPP), doble clic en **`importar-copia.bat`**, arrastra el archivo a la ventana, pulsa Enter y escribe `SI`. Sustituye los datos de esa instalación por los de la copia.
+3. Entras al panel con **el mismo email y la misma contraseña que en Render** (no los de `server/.env`).
+
+Lo mismo funciona al revés (de XAMPP a Render o a otro PostgreSQL) y entre dos PC.
+
+**Copias de seguridad en tu PC**
+- Doble clic en **`hacer-copia.bat`**: guarda una copia en la carpeta `copias/`. Hazla a menudo y guárdala fuera de la PC (USB o nube). Si la PC se daña, con esa copia lo recuperas todo.
+- O desde el panel: **Mi cuenta → Descargar copia de seguridad**.
+- Las copias contienen datos de tus clientes: no las compartas. Git las ignora para que no se suban a GitHub.
+
+> ⚠ La base gratuita de Render **caduca a los 30 días** de crearla. Descarga la copia **antes** para no perder nada.
+
+**Detalles técnicos**
+- El motor se elige por `DATABASE_URL`: `mysql://…` (XAMPP) o `postgresql://…`. El esquema de MySQL (`server/prisma/mysql/schema.prisma`) se genera solo a partir de `server/prisma/schema.prisma` (`npm run db:mysql-schema`). Las migraciones de cada motor van en su carpeta.
+- Para respetar el `max_allowed_packet` de 1 MB de XAMPP, los archivos se guardan en trozos de 512 KB.
+- En MySQL, las compras simultáneas de la última unidad pueden provocar un bloqueo mutuo; la transacción se repite sola y el segundo cliente recibe "sin stock", como en PostgreSQL.
+- Los números de pedido nunca se repiten. En MySQL puede saltarse alguno si una compra se cancela a medias.
 
 ## 3. Iniciar el sistema
 
@@ -297,6 +328,8 @@ Para vender de verdad, cambia en Render el servicio y la base de datos a un plan
 | `npm run db:seed` | Datos iniciales (se puede repetir sin duplicar) |
 | `npm run catalogo:importar` | Importa/completa el catálogo de `server/catalog/productos.json` |
 | `npm run db:studio` | Explorador visual de la base de datos |
+| `npm run datos:exportar` | Copia de seguridad completa en `copias/` (o `hacer-copia.bat`) |
+| `npm run datos:importar -- archivo.jsonl.gz --reemplazar` | Carga una copia y reemplaza los datos actuales (o `importar-copia.bat`) |
 | `npm run typecheck` | Comprobación de tipos de todo el proyecto |
 | `npm test` | Pruebas de extremo a extremo de la API (requiere `TEST_DATABASE_URL`) |
 | `npm run build` / `npm run start:prod` | Compilar y ejecutar en modo producción (migra, crea el admin y aplica el catálogo) |
@@ -306,6 +339,8 @@ Para vender de verdad, cambia en Render el servicio y la base de datos a un plan
 ```bash
 # PowerShell
 $env:TEST_DATABASE_URL="postgresql://postgres:TU_CLAVE@localhost:5432/tienda_zapatillas_test"; npm test
+# o con XAMPP:
+$env:TEST_DATABASE_URL="mysql://root:@localhost:3306/tienda_zapatillas_test"; npm test
 ```
 
 Las pruebas recorren el flujo completo (registrar Urban X, publicarlo, comprarlo, confirmarlo y cancelarlo) y comprueban la seguridad, la compra simultánea de la última unidad, la idempotencia y el historial de precios.

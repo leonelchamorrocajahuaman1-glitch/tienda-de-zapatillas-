@@ -1,5 +1,5 @@
 import type { MovementType } from "@prisma/client";
-import type { Tx } from "../db";
+import { portableSql, type Tx } from "../db";
 import { conflict } from "../lib/errors";
 
 /**
@@ -42,35 +42,35 @@ async function logMovement(
 }
 
 export async function reserve(tx: Tx, variantId: string, qty: number, ctx: MovementCtx): Promise<boolean> {
-  const rows = await tx.$executeRaw`
+  const rows = await tx.$executeRaw(portableSql`
     UPDATE "ProductVariant"
        SET "reserved" = "reserved" + ${qty}, "updatedAt" = NOW()
-     WHERE "id" = ${variantId} AND "active" = true AND "stock" - "reserved" >= ${qty}`;
+     WHERE "id" = ${variantId} AND "active" = true AND "stock" - "reserved" >= ${qty}`);
   if (rows === 1) await logMovement(tx, variantId, "RESERVE", 0, qty, ctx);
   return rows === 1;
 }
 
 export async function release(tx: Tx, variantId: string, qty: number, ctx: MovementCtx) {
-  const rows = await tx.$executeRaw`
+  const rows = await tx.$executeRaw(portableSql`
     UPDATE "ProductVariant"
        SET "reserved" = "reserved" - ${qty}, "updatedAt" = NOW()
-     WHERE "id" = ${variantId} AND "reserved" >= ${qty}`;
+     WHERE "id" = ${variantId} AND "reserved" >= ${qty}`);
   if (rows !== 1) throw conflict("Inconsistencia de inventario al liberar la reserva");
   await logMovement(tx, variantId, "RELEASE", 0, -qty, ctx);
 }
 
 export async function commit(tx: Tx, variantId: string, qty: number, ctx: MovementCtx) {
-  const rows = await tx.$executeRaw`
+  const rows = await tx.$executeRaw(portableSql`
     UPDATE "ProductVariant"
        SET "stock" = "stock" - ${qty}, "reserved" = "reserved" - ${qty}, "updatedAt" = NOW()
-     WHERE "id" = ${variantId} AND "reserved" >= ${qty} AND "stock" >= ${qty}`;
+     WHERE "id" = ${variantId} AND "reserved" >= ${qty} AND "stock" >= ${qty}`);
   if (rows !== 1) throw conflict("No hay stock suficiente para confirmar el pedido");
   await logMovement(tx, variantId, "COMMIT", -qty, -qty, ctx);
 }
 
 export async function restock(tx: Tx, variantId: string, qty: number, ctx: MovementCtx) {
-  const rows = await tx.$executeRaw`
-    UPDATE "ProductVariant" SET "stock" = "stock" + ${qty}, "updatedAt" = NOW() WHERE "id" = ${variantId}`;
+  const rows = await tx.$executeRaw(portableSql`
+    UPDATE "ProductVariant" SET "stock" = "stock" + ${qty}, "updatedAt" = NOW() WHERE "id" = ${variantId}`);
   if (rows === 1) await logMovement(tx, variantId, "RESTOCK", qty, 0, ctx);
 }
 
@@ -82,9 +82,9 @@ export async function setStock(tx: Tx, variantId: string, newStock: number, ctx:
   const current = await tx.productVariant.findUnique({ where: { id: variantId }, select: { stock: true } });
   if (!current) throw conflict("Variante no encontrada");
   if (current.stock === newStock) return;
-  const rows = await tx.$executeRaw`
+  const rows = await tx.$executeRaw(portableSql`
     UPDATE "ProductVariant" SET "stock" = ${newStock}, "updatedAt" = NOW()
-     WHERE "id" = ${variantId} AND "reserved" <= ${newStock}`;
+     WHERE "id" = ${variantId} AND "reserved" <= ${newStock}`);
   if (rows !== 1) {
     throw conflict("El stock no puede ser menor que las unidades reservadas por pedidos pendientes");
   }

@@ -4,9 +4,8 @@
  *
  *   TEST_DATABASE_URL=postgresql://.../tienda_zapatillas_test npm test
  */
-import { execSync } from "node:child_process";
 import http from "node:http";
-import path from "node:path";
+import { resetTestDb } from "./test-db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
@@ -33,19 +32,9 @@ run("Boletas e impresión", () => {
   let agentToken: string;
 
   beforeAll(async () => {
-    if (!/_test(\?|$)/.test(new URL(TEST_DB!).pathname)) throw new Error("TEST_DATABASE_URL debe terminar en _test");
-    process.env.DATABASE_URL = TEST_DB!;
     process.env.JWT_SECRET_STORE ??= "test-store-secret-0123456789abcdef";
     process.env.JWT_SECRET_ADMIN ??= "test-admin-secret-fedcba9876543210";
-    execSync("npx prisma migrate deploy", {
-      cwd: path.resolve(__dirname, ".."),
-      env: { ...process.env, DATABASE_URL: TEST_DB! },
-      stdio: "ignore",
-    });
-    ({ prisma } = await import("../src/db"));
-    const tables = await prisma.$queryRaw<{ tablename: string }[]>`
-      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
-    await prisma.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(", ")} RESTART IDENTITY CASCADE`);
+    prisma = await resetTestDb(TEST_DB!);
     const { createApp } = await import("../src/app");
     const { hashPassword } = await import("../src/lib/passwords");
     app = createApp();

@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { prisma } from "../src/db";
+import { prisma, textEquals } from "../src/db";
 import { slugify } from "../src/lib/slug";
 import { imageMime, modelMime, readStoredFile, removeByUrl, saveFile } from "../src/storage/uploads";
 
@@ -56,21 +56,21 @@ const file = z.object({ productos: z.array(item) });
 
 async function findOrCreateBrand(name: string) {
   return (
-    (await prisma.brand.findFirst({ where: { name: { equals: name, mode: "insensitive" } } })) ??
+    (await prisma.brand.findFirst({ where: { name: textEquals(name) } })) ??
     (await prisma.brand.create({ data: { name, slug: slugify(name) } }))
   );
 }
 
 async function findOrCreateCategory(name: string) {
   return (
-    (await prisma.category.findFirst({ where: { name: { equals: name, mode: "insensitive" } } })) ??
+    (await prisma.category.findFirst({ where: { name: textEquals(name) } })) ??
     (await prisma.category.create({ data: { name, slug: slugify(name) } }))
   );
 }
 
 async function findOrCreateColor(name: string) {
   return (
-    (await prisma.color.findFirst({ where: { name: { equals: name, mode: "insensitive" } } })) ??
+    (await prisma.color.findFirst({ where: { name: textEquals(name) } })) ??
     (await prisma.color.create({ data: { name, hex: DEFAULT_HEX[name.toLowerCase()] ?? "#888888" } }))
   );
 }

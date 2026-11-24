@@ -23,7 +23,9 @@
     "start": "npm run start -w server",
     "start:prod": "npm run start:prod -w server",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test -w server"
+    "test": "npm run test -w server",
+    "datos:exportar": "npm run datos:exportar -w server --",
+    "datos:importar": "npm run datos:importar -w server --"
   },
   "devDependencies": {
     "concurrently": "9.1.2"

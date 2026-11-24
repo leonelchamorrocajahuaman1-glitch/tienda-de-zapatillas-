@@ -5,17 +5,20 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "build": "node scripts/prisma.mjs generate && tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
-    "start:prod": "prisma migrate deploy && prisma db seed && tsx scripts/importar-catalogo.ts --arranque && node dist/index.js",
+    "start:prod": "node scripts/prisma.mjs migrate deploy && node scripts/prisma.mjs db seed && tsx scripts/importar-catalogo.ts --arranque && node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
-    "db:studio": "prisma studio",
-    "postinstall": "prisma generate",
-    "catalog:import": "tsx scripts/importar-catalogo.ts"
+    "db:migrate": "node scripts/prisma.mjs migrate dev",
+    "db:deploy": "node scripts/prisma.mjs migrate deploy",
+    "db:seed": "node scripts/prisma.mjs db seed",
+    "db:studio": "node scripts/prisma.mjs studio",
+    "postinstall": "node scripts/prisma.mjs generate",
+    "catalog:import": "tsx scripts/importar-catalogo.ts",
+    "db:mysql-schema": "node scripts/schema-mysql.mjs",
+    "datos:exportar": "tsx scripts/datos.ts exportar",
+    "datos:importar": "tsx scripts/datos.ts importar"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

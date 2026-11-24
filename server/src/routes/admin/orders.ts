@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
-import { prisma } from "../../db";
+import { prisma, textContains } from "../../db";
 import { notFound } from "../../lib/errors";
 import { parse } from "../../lib/validate";
 import { ALLOWED_TRANSITIONS, changeOrderStatus, orderInclude } from "../../services/orders";
@@ -27,9 +27,9 @@ adminOrdersRouter.get("/", async (req, res) => {
       ? {
           OR: [
             ...(Number.isFinite(num) ? [{ number: num }] : []),
-            { user: { email: { contains: q.q, mode: "insensitive" } } },
-            { user: { name: { contains: q.q, mode: "insensitive" } } },
-            { shippingName: { contains: q.q, mode: "insensitive" } },
+            { user: { email: textContains(q.q) } },
+            { user: { name: textContains(q.q) } },
+            { shippingName: textContains(q.q) },
           ],
         }
       : {}),

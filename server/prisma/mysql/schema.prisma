@@ -1,0 +1,478 @@
+// ⚠ ARCHIVO GENERADO desde ../schema.prisma por scripts/schema-mysql.mjs: no lo edites.
+// Base de datos MySQL / MariaDB (XAMPP).
+
+// Base de datos ÚNICA compartida por la tienda pública y el panel administrativo.
+// Los importes se guardan en céntimos (Int) para evitar errores de redondeo:
+// S/ 199.90 => 19990.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── Usuarios ───────────────────────────────
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String @db.Text
+  name         String @db.Text
+  phone        String? @db.Text
+  role         Role     @default(CUSTOMER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cart                Cart?
+  orders              Order[]
+  statusChanges       OrderStatusHistory[]
+  priceChanges        PriceHistory[]
+  inventoryMovements  InventoryMovement[]
+  printRequests       PrintJob[]
+}
+
+// ─────────────────────────── Catálogo base ───────────────────────────
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Color {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  hex       String           @default("#000000") @db.Text
+  createdAt DateTime         @default(now())
+  variants  ProductVariant[]
+  images    ProductImage[]
+}
+
+model Size {
+  id        String           @id @default(cuid())
+  label     String           @unique // p. ej. "40" o "40.5"
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  variants  ProductVariant[]
+}
+
+// ─────────────────────────────── Productos ───────────────────────────────
+
+enum ProductStatus {
+  DRAFT // borrador: solo visible en el panel
+  PUBLISHED // visible en la tienda
+  ARCHIVED // desactivado: oculto en la tienda, se conserva para el historial
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  name            String @db.Text
+  slug            String        @unique
+  tagline         String? @db.Text // frase cinematográfica, p. ej. "Born from the streets"
+  description     String        @default("") @db.Text
+  brandId         String?
+  categoryId      String?
+  priceCents      Int
+  discountPercent Int           @default(0) // 0–90
+  status          ProductStatus @default(DRAFT)
+  featured        Boolean       @default(false) // aparece en las escenas 3D de la portada
+  accentColor     String        @default("#ff2a2a") @db.Text
+  modelUrl        String? @db.Text // ruta al .glb / .gltf subido
+  modelFileName   String? @db.Text
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  brand        Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  category     Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images       ProductImage[]
+  variants     ProductVariant[]
+  priceHistory PriceHistory[]
+  orderItems   OrderItem[]
+
+  @@index([status])
+  @@index([brandId])
+  @@index([categoryId])
+}
+
+enum ImageKind {
+  GALLERY // fotos normales del producto
+  SPIN // fotogramas de la vista 360° (fotos tomadas girando la zapatilla)
+}
+
+model ProductImage {
+  id        String    @id @default(cuid())
+  productId String
+  colorId   String? // imagen asociada a un color concreto (opcional)
+  kind      ImageKind @default(GALLERY)
+  url       String @db.Text
+  alt       String    @default("") @db.Text
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color   Color?  @relation(fields: [colorId], references: [id], onDelete: SetNull)
+
+  @@index([productId, kind])
+}
+
+// Inventario: una fila por combinación producto + talla + color.
+//   stock    = unidades físicas en almacén
+//   reserved = unidades apartadas por pedidos PENDIENTES (aún no confirmados)
+//   disponible para vender = stock - reserved
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  sizeId    String
+  colorId   String
+  sku       String?  @unique
+  stock     Int      @default(0)
+  reserved  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size       Size                @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  color      Color               @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  movements  InventoryMovement[]
+
+  @@unique([productId, sizeId, colorId])
+}
+
+model PriceHistory {
+  id              String   @id @default(cuid())
+  productId       String
+  priceCents      Int
+  discountPercent Int
+  changedById     String?
+  createdAt       DateTime @default(now())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+}
+
+enum MovementType {
+  ADJUSTMENT // ajuste manual desde el panel
+  RESERVE // pedido creado (pendiente)
+  RELEASE // pedido pendiente cancelado
+  COMMIT // pedido confirmado: sale del almacén
+  RESTOCK // pedido confirmado y luego cancelado: vuelve al almacén
+}
+
+// Registro auditable de cada cambio de inventario.
+model InventoryMovement {
+  id            String       @id @default(cuid())
+  variantId     String
+  type          MovementType
+  stockDelta    Int          @default(0)
+  reservedDelta Int          @default(0)
+  orderId       String?
+  note          String? @db.Text
+  userId        String?
+  createdAt     DateTime     @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order   Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([variantId, createdAt])
+}
+
+// ─────────────────────────────── Carrito ───────────────────────────────
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  variantId String
+  quantity  Int
+  createdAt DateTime @default(now())
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+}
+
+// ─────────────────────────────── Pedidos ───────────────────────────────
+
+enum OrderStatus {
+  PENDING // Pendiente
+  CONFIRMED // Confirmado
+  PREPARING // Preparando
+  SHIPPED // Enviado
+  DELIVERED // Entregado
+  CANCELLED // Cancelado
+}
+
+// Estado del inventario asociado a un pedido. Impide descontar dos veces.
+enum InventoryState {
+  RESERVED // unidades apartadas (reserved += q)
+  COMMITTED // unidades descontadas del stock (stock -= q)
+  RELEASED // reserva liberada tras cancelar un pedido pendiente
+  RESTOCKED // unidades devueltas al stock tras cancelar un pedido confirmado
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY // pago contra entrega
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+model Order {
+  id             String         @id @default(cuid())
+  number         Int            @unique @default(autoincrement())
+  userId         String
+  status         OrderStatus    @default(PENDING)
+  inventoryState InventoryState @default(RESERVED)
+  idempotencyKey String?        @unique
+
+  subtotalCents Int // suma de precios de lista
+  discountCents Int // ahorro por descuentos
+  shippingCents Int
+  totalCents    Int
+
+  paymentMethod    PaymentMethod @default(CASH_ON_DELIVERY)
+  paymentStatus    PaymentStatus @default(PENDING)
+  paymentProvider  String? @db.Text // reservado para la futura pasarela de pago
+  paymentReference String? @db.Text
+
+  shippingName      String @db.Text
+  shippingPhone     String @db.Text
+  shippingAddress   String @db.Text
+  shippingDistrict  String @db.Text
+  shippingCity      String @db.Text
+  shippingReference String? @db.Text
+  notes             String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  receipt       Receipt?
+  movements     InventoryMovement[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// Copia inmutable de lo que se vendió y a qué precio (precio histórico).
+model OrderItem {
+  id                  String  @id @default(cuid())
+  orderId             String
+  productId           String?
+  variantId           String?
+  productName         String @db.Text
+  brandName           String? @db.Text
+  sizeLabel           String @db.Text
+  colorName           String @db.Text
+  imageUrl            String? @db.Text
+  unitListPriceCents  Int // precio de lista en el momento de la compra
+  discountPercent     Int
+  unitPriceCents      Int // precio final cobrado por unidad
+  quantity            Int
+  lineTotalCents      Int
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+}
+
+model OrderStatusHistory {
+  id          String       @id @default(cuid())
+  orderId     String
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  note        String? @db.Text
+  changedById String?
+  createdAt   DateTime     @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User? @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+}
+
+// ─────────────────────────── Archivos subidos ───────────────────────────
+// Imágenes y modelos 3D se guardan en la propia base de datos: así funcionan
+// igual en tu PC y en un hosting sin disco permanente, y una copia de
+// seguridad de la base incluye también los archivos.
+model StoredFile {
+  id        String            @id @default(cuid())
+  kind      String @db.Text // "image" | "model"
+  mimeType  String @db.Text
+  fileName  String @db.Text
+  size      Int
+  data      Bytes // archivos pequeños: el contenido completo; si va en trozos, vacío
+  chunks    Int               @default(0) // nº de trozos en StoredFileChunk (0 = está en "data")
+  parts     StoredFileChunk[]
+  createdAt DateTime          @default(now())
+}
+
+// Archivos grandes (modelos 3D) en trozos de 2 MB: guardarlos y servirlos de una
+// sola vez multiplicaba la memoria del servidor y lo tumbaba en Render (512 MB).
+model StoredFileChunk {
+  fileId String
+  index  Int
+  data   Bytes
+  file   StoredFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, index])
+}
+
+// ─────────────────────────── Boletas e impresión ───────────────────────────
+
+enum ReceiptTrigger {
+  ON_CONFIRMED // al confirmar el pedido (stock descontado); el pago contra entrega figura "por cobrar"
+  ON_PAID // cuando el pago está verificado (pago contra entrega: al marcar Entregado)
+}
+
+enum PrintJobStatus {
+  PENDING // en cola, esperando al agente
+  PRINTING // el agente la tomó y está imprimiendo
+  PRINTED // impresa
+  FAILED // fallida (nunca se reintenta sola: se reintenta a mano desde el panel)
+  CANCELLED // cancelada (p. ej. pedido anulado antes de imprimir)
+}
+
+enum PrintJobKind {
+  RECEIPT
+  TEST
+}
+
+enum PrintJobReason {
+  AUTO // impresión automática al confirmar la compra
+  MANUAL // emitida/impresa a mano desde el panel
+  REPRINT // reimpresión (se marca como COPIA)
+  RETRY // reintento de una impresión fallida
+  TEST // página de prueba
+}
+
+// Configuración única (fila id = 1)
+model ReceiptSettings {
+  id            Int            @id @default(1)
+  enabled       Boolean        @default(true) // generar boletas
+  autoPrint     Boolean        @default(true) // enviarlas a la impresora automáticamente
+  trigger       ReceiptTrigger @default(ON_CONFIRMED)
+  paperWidth    Int            @default(80) // 58 | 80 (mm)
+  connection    String         @default("windows") @db.Text // "windows" (impresora instalada) | "network" (IP:9100)
+  printerName   String? @db.Text
+  networkHost   String? @db.Text
+  networkPort   Int            @default(9100)
+  agentId       String? @db.Text // agente que imprime; null = cualquier agente activo
+  charset       String         @default("cp850") @db.Text // cp850 | cp1252 | ascii
+  cutPaper      Boolean        @default(true)
+  printLogo     Boolean        @default(true)
+  logoUrl       String? @db.Text // logo propio (PNG); null = logo por defecto
+  copies        Int            @default(1)
+  storeName     String? @db.Text
+  title         String         @default("BOLETA DE VENTA") @db.Text
+  series        String         @default("B001") @db.Text
+  headerLines   String         @default("") @db.Text // RUC, dirección, teléfono… (una por línea)
+  footerMessage String         @default("¡Gracias por tu compra!") @db.Text
+  legalNote     String         @default("") @db.Text
+  updatedAt     DateTime       @updatedAt
+}
+
+// Correlativo por serie (B001 → 1, 2, 3…), incrementado dentro de la transacción
+model ReceiptSeries {
+  series String @id
+  last   Int    @default(0)
+}
+
+model Receipt {
+  id         String    @id @default(cuid())
+  code       String    @unique // B001-00000001
+  series     String
+  number     Int
+  orderId    String    @unique // una sola boleta por pedido
+  snapshot   Json // copia inmutable de lo vendido (para reimprimir idéntica)
+  issuedAt   DateTime  @default(now())
+  voidedAt   DateTime?
+  voidReason String? @db.Text
+
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  printJobs PrintJob[]
+
+  @@unique([series, number])
+  @@index([issuedAt])
+}
+
+model PrintJob {
+  id            String         @id @default(cuid())
+  receiptId     String?
+  kind          PrintJobKind   @default(RECEIPT)
+  reason        PrintJobReason
+  status        PrintJobStatus @default(PENDING)
+  agentId       String?
+  printerLabel  String? @db.Text // impresora usada
+  error         String? @db.Text
+  retriedAt     DateTime? // ya se creó un reintento de este trabajo (evita duplicarlo)
+  externalRef   String? @db.Text // referencia enviada a la central de impresión (la central no imprime dos veces la misma)
+  requestedById String?
+  createdAt     DateTime       @default(now())
+  claimedAt     DateTime?
+  finishedAt    DateTime?
+
+  receipt     Receipt?    @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  agent       PrintAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  requestedBy User?       @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([receiptId])
+}
+
+// Programa instalado en la PC de la tienda que recibe los trabajos y los imprime
+model PrintAgent {
+  id         String    @id @default(cuid())
+  name       String @db.Text
+  tokenHash  String    @unique // solo se guarda el hash del token
+  version    String? @db.Text
+  hostname   String? @db.Text
+  printers   Json? // impresoras que el agente ve en Windows
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  jobs PrintJob[]
+}

@@ -1,5 +1,5 @@
 import { Prisma, type OrderStatus } from "@prisma/client";
-import { prisma } from "../db";
+import { prisma, withDeadlockRetry } from "../db";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors";
 import { finalPrice, shippingFor } from "../lib/pricing";
 import { getPaymentProvider } from "../payments";
@@ -45,7 +45,7 @@ export async function createOrderFromCart(
   const provider = getPaymentProvider(paymentMethod);
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await withDeadlockRetry(() => prisma.$transaction(async (tx) => {
       const cart = await tx.cart.findUnique({
         where: { userId },
         include: {
@@ -131,7 +131,7 @@ export async function createOrderFromCart(
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
       return tx.order.findUniqueOrThrow({ where: { id: order.id }, include: orderInclude });
-    });
+    }));
   } catch (err) {
     // Doble envío simultáneo con la misma clave: devolver el pedido ya creado.
     if (idempotencyKey && err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
@@ -158,7 +158,7 @@ export async function changeOrderStatus(
   actor: { id: string; isAdmin: boolean },
   note?: string | null,
 ) {
-  return prisma.$transaction(async (tx) => {
+  return withDeadlockRetry(() => prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
     if (!order) throw notFound("Pedido no encontrado");
     if (!actor.isAdmin) {
@@ -212,5 +212,5 @@ export async function changeOrderStatus(
     await onOrderStatusChanged(tx, order.id, to, paymentStatus, actor.id);
 
     return tx.order.findUniqueOrThrow({ where: { id: order.id }, include: orderInclude });
-  });
+  }));
 }

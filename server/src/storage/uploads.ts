@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { Request, Response } from "express";
 import multer from "multer";
-import { prisma } from "../db";
+import { isMysql, prisma } from "../db";
 import { badRequest } from "../lib/errors";
 
 /**
@@ -14,7 +14,8 @@ import { badRequest } from "../lib/errors";
  * de 800 MB de memoria y el servidor de Render (512 MB) se reiniciaba.
  */
 
-export const CHUNK_SIZE = 2 * 1024 * 1024;
+// XAMPP trae max_allowed_packet = 1 MB: en MySQL los trozos son más pequeños
+export const CHUNK_SIZE = isMysql ? 512 * 1024 : 2 * 1024 * 1024;
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
 const MODEL_EXT = new Set([".glb", ".gltf"]);

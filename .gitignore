@@ -11,3 +11,8 @@ print-agent/registro-trabajos.json*
 print-agent/imprimir-raw.ps1
 
 __pycache__/
+
+# Copias de seguridad: contienen datos de clientes y no deben subirse a GitHub
+copias/
+server/copias/
+*.jsonl.gz

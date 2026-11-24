@@ -4,8 +4,7 @@
  *
  *   TEST_DATABASE_URL=postgresql://.../tienda_zapatillas_test npm test
  */
-import { execSync } from "node:child_process";
-import path from "node:path";
+import { resetTestDb } from "./test-db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
@@ -41,23 +40,10 @@ function minimalGlb(): Buffer {
 
 run("Flujo completo tienda + panel sobre la misma base de datos", () => {
   beforeAll(async () => {
-    process.env.DATABASE_URL = TEST_DB!;
     process.env.JWT_SECRET_STORE ??= "test-store-secret-0123456789abcdef";
     process.env.JWT_SECRET_ADMIN ??= "test-admin-secret-fedcba9876543210";
-    const env = { ...process.env, DATABASE_URL: TEST_DB! };
-    const cwd = path.resolve(__dirname, "..");
-    if (!/_test(\?|$)/.test(new URL(TEST_DB!).pathname + "")) {
-      throw new Error("Por seguridad, TEST_DATABASE_URL debe apuntar a una base cuyo nombre termine en _test");
-    }
-    execSync("npx prisma migrate deploy", { cwd, env, stdio: "ignore" });
-
-    ({ prisma } = await import("../src/db"));
     // Base de pruebas: se vacía antes de cada ejecución.
-    const tables = await prisma.$queryRaw<{ tablename: string }[]>`
-      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
-    await prisma.$executeRawUnsafe(
-      `TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(", ")} RESTART IDENTITY CASCADE`,
-    );
+    prisma = await resetTestDb(TEST_DB!);
     const { createApp } = await import("../src/app");
     const { hashPassword } = await import("../src/lib/passwords");
     app = createApp();
@@ -161,7 +147,8 @@ run("Flujo completo tienda + panel sobre la misma base de datos", () => {
       .attach("model", big, { filename: "grande.glb", contentType: "model/gltf-binary" });
     expect(up.status).toBe(201);
     const id = up.body.modelUrl.match(/\/uploads\/([a-z0-9]+)/)[1];
-    expect(await prisma.storedFileChunk.count({ where: { fileId: id } })).toBe(3); // 2 + 2 + 1,5 MB
+    const { CHUNK_SIZE } = await import("../src/storage/uploads");
+    expect(await prisma.storedFileChunk.count({ where: { fileId: id } })).toBe(Math.ceil(big.length / CHUNK_SIZE));
 
     const served = await request(app)
       .get(up.body.modelUrl)
@@ -372,5 +359,65 @@ run("Flujo completo tienda + panel sobre la misma base de datos", () => {
   it("despublicar oculta el producto de la tienda", async () => {
     await adminAgent.post(`/api/admin/products/${productId}/status`).send({ status: "DRAFT" });
     expect((await request(app).get("/api/catalog/products/urban-x")).status).toBe(404);
+  });
+
+  it("copia de seguridad: solo el admin la descarga y al importarla la base queda idéntica", async () => {
+    const { PassThrough } = await import("node:stream");
+    const { exportBackup, importBackup, modelsInOrder } = await import("../src/services/backup");
+    expect((await request(app).get("/api/admin/backup")).status).toBe(401);
+    const download = await adminAgent.get("/api/admin/backup").buffer(true).parse((res, cb) => {
+      const parts: Buffer[] = [];
+      res.on("data", (d: Buffer) => parts.push(d));
+      res.on("end", () => cb(null, Buffer.concat(parts)));
+    });
+    expect(download.status).toBe(200);
+    expect(download.headers["content-disposition"]).toMatch(/sole20-copia-.*\.jsonl\.gz/);
+
+    const snapshot = async () => {
+      const out: Record<string, unknown[]> = {};
+      for (const m of modelsInOrder()) {
+        const ids = m.primaryKey?.fields ?? m.fields.filter((f) => f.isId).map((f) => f.name);
+        const delegate = (prisma as unknown as Record<string, { findMany(a: object): Promise<unknown[]> }>)[
+          m.name[0].toLowerCase() + m.name.slice(1)
+        ];
+        out[m.name] = await delegate.findMany({ orderBy: ids.map((f) => ({ [f]: "asc" })) });
+      }
+      return out;
+    };
+    const before = await snapshot();
+    // Sobre una base con datos hay que pedir reemplazar
+    const source = () => {
+      const s = new PassThrough();
+      s.end(download.body as Buffer);
+      return s;
+    };
+    await expect(importBackup(source())).rejects.toThrow(/ya tiene datos/);
+    const result = await importBackup(source(), { replace: true });
+    expect(result.registros.Order).toBe((before.Order as unknown[]).length);
+    expect(await snapshot()).toEqual(before);
+    // Se sigue entrando con las mismas credenciales y la numeración de pedidos continúa sin repetir
+    // (MySQL no reutiliza números gastados en transacciones canceladas: puede saltar alguno)
+    expect((await request(app).post("/api/admin/auth/login").send(ADMIN)).status).toBe(200);
+    const last = await prisma.order.findFirstOrThrow({ orderBy: { number: "desc" } });
+    const created = await prisma.order.create({
+      data: { ...(({ id: _i, number: _n, idempotencyKey: _k, ...rest }) => rest)(last), id: undefined },
+    });
+    expect(created.number).toBeGreaterThan(last.number);
+    // La copia también se puede generar sin el panel (npm run datos:exportar)
+    const again = new PassThrough();
+    const parts: Buffer[] = [];
+    again.on("data", (d: Buffer) => parts.push(d));
+    await exportBackup(again);
+    expect(Buffer.concat(parts).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Esquema de XAMPP (MySQL)", () => {
+  it("prisma/mysql/schema.prisma está al día con prisma/schema.prisma", async () => {
+    const { execFileSync } = await import("node:child_process");
+    const path = await import("node:path");
+    expect(() =>
+      execFileSync(process.execPath, ["scripts/schema-mysql.mjs", "--check"], { cwd: path.resolve(__dirname, ".."), stdio: "pipe" }),
+    ).not.toThrow();
   });
 });

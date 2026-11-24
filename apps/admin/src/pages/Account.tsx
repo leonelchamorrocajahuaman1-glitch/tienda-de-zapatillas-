@@ -50,6 +50,19 @@ export function AccountPage() {
           <button className="btn btn--primary" disabled={busy}>{busy ? "Guardando…" : "Actualizar contraseña"}</button>
         </div>
       </form>
+      <section className="card" style={{ maxWidth: 480, marginTop: 20 }}>
+        <div className="card__head"><h2>Copia de seguridad</h2></div>
+        <div className="card__body form-grid">
+          <p className="muted" style={{ margin: 0 }}>
+            Descarga todos los datos de la tienda: productos, precios, stock, clientes, pedidos, boletas, fotos y modelos 3D.
+            Sirve para guardarlos y para pasar la tienda a otra instalación (por ejemplo, a tu PC con XAMPP).
+          </p>
+          <a className="btn" href="/api/admin/backup" download>
+            Descargar copia de seguridad
+          </a>
+          <span className="hint">Contiene datos de tus clientes: guárdala en un lugar seguro y no la compartas.</span>
+        </div>
+      </section>
     </>
   );
 }

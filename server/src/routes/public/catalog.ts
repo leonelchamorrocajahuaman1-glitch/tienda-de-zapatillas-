@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
-import { prisma } from "../../db";
+import { prisma, textContains } from "../../db";
 import { notFound } from "../../lib/errors";
 import { finalPrice } from "../../lib/pricing";
 import { parse } from "../../lib/validate";
@@ -96,11 +96,11 @@ catalogRouter.get("/products", async (req, res) => {
     ...(q.q
       ? {
           OR: [
-            { name: { contains: q.q, mode: "insensitive" } },
-            { tagline: { contains: q.q, mode: "insensitive" } },
-            { description: { contains: q.q, mode: "insensitive" } },
-            { brand: { name: { contains: q.q, mode: "insensitive" } } },
-            { category: { name: { contains: q.q, mode: "insensitive" } } },
+            { name: textContains(q.q) },
+            { tagline: textContains(q.q) },
+            { description: textContains(q.q) },
+            { brand: { name: textContains(q.q) } },
+            { category: { name: textContains(q.q) } },
           ],
         }
       : {}),

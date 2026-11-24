@@ -56,11 +56,17 @@ if (!fs.existsSync(envPath)) {
   };
   const ask = async (q, def) => (await prompt(`${q} ${dim(`[${def}]`)}: `)).trim() || def;
   console.log("Responde o pulsa Enter para usar el valor sugerido.\n");
-  const dbUser = await ask("Usuario de PostgreSQL", "postgres");
-  const dbPass = await ask("Contraseña de PostgreSQL", "postgres");
-  const dbHost = await ask("Host de PostgreSQL", "localhost");
-  const dbPort = await ask("Puerto de PostgreSQL", "5432");
-  const dbName = await ask("Nombre de la base de datos", "tienda_zapatillas");
+  console.log("Base de datos:\n  1) XAMPP (MySQL / MariaDB, la de phpMyAdmin)\n  2) PostgreSQL");
+  const xampp = (await ask("Elige 1 o 2", "1")) !== "2";
+  const engine = xampp ? "MySQL (XAMPP)" : "PostgreSQL";
+  const dbUser = await ask(`Usuario de ${engine}`, xampp ? "root" : "postgres");
+  // XAMPP trae el usuario root sin contraseña
+  const dbPass = xampp
+    ? (await prompt(`Contraseña de ${engine} ${dim("[vacía]")}: `)).trim()
+    : await ask(`Contraseña de ${engine}`, "postgres");
+  const dbHost = await ask(`Host de ${engine}`, "localhost");
+  const dbPort = await ask(`Puerto de ${engine}`, xampp ? "3306" : "5432");
+  const dbName = await ask("Nombre de la base de datos", xampp ? "sole20" : "tienda_zapatillas");
   const adminEmail = await ask("Email del administrador", "admin@tienda.local");
   let adminPass = "";
   while (adminPass.length < 10) {
@@ -78,10 +84,8 @@ if (!fs.existsSync(envPath)) {
   const set = (key, value) => {
     env = env.replace(new RegExp(`^${key}=.*$`, "m"), `${key}=${value}`);
   };
-  set(
-    "DATABASE_URL",
-    q(`postgresql://${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}?schema=public`),
-  );
+  const credentials = `${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}`;
+  set("DATABASE_URL", q(xampp ? `mysql://${credentials}` : `postgresql://${credentials}?schema=public`));
   set("JWT_SECRET_STORE", q(secret()));
   set("JWT_SECRET_ADMIN", q(secret()));
   set("ADMIN_EMAIL", q(adminEmail));
@@ -94,14 +98,18 @@ if (!fs.existsSync(envPath)) {
 
 run("npm", ["install"]);
 console.log(bold("\nCreando la base de datos y aplicando migraciones…"));
-run("npx", ["prisma", "migrate", "deploy"], { cwd: path.join(root, "server") });
+if (/DATABASE_URL="?mysql:/m.test(fs.readFileSync(envPath, "utf8"))) {
+  console.log(dim("(XAMPP: el módulo MySQL debe estar iniciado en el Panel de control de XAMPP)"));
+}
+run("npm", ["run", "db:deploy", "-w", "server"]);
 console.log(bold("\nCargando datos iniciales…"));
-run("npx", ["prisma", "db", "seed"], { cwd: path.join(root, "server") });
+run("npm", ["run", "db:seed", "-w", "server"]);
 console.log(bold("\nImportando el catálogo (server/catalog/productos.json)…"));
 run("npx", ["tsx", "scripts/importar-catalogo.ts"], { cwd: path.join(root, "server") });
 
 console.log(green(bold("\n✔ Todo listo.\n")));
-console.log(`Inicia el sistema con:  ${bold("npm run dev")}   (o doble clic en iniciar.bat)\n`);
+console.log(`Inicia el sistema con:  ${bold("npm run dev")}   (o doble clic en iniciar.bat)`);
+console.log(`¿Vienes de Render? Importa tu copia de seguridad con  ${bold("importar-copia.bat")}\n`);
 console.log(`  Tienda:  http://localhost:5173`);
 console.log(`  Panel:   http://localhost:5174/admin`);
 console.log(`  API:     http://localhost:4000/api/health\n`);

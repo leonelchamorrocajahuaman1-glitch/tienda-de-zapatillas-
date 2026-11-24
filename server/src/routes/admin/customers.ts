@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { prisma } from "../../db";
+import { prisma, textContains } from "../../db";
 import { notFound } from "../../lib/errors";
 import { parse } from "../../lib/validate";
 
@@ -14,8 +14,8 @@ adminCustomersRouter.get("/", async (req, res) => {
       ...(q.q
         ? {
             OR: [
-              { name: { contains: q.q, mode: "insensitive" } },
-              { email: { contains: q.q, mode: "insensitive" } },
+              { name: textContains(q.q) },
+              { email: textContains(q.q) },
               { phone: { contains: q.q } },
             ],
           }
