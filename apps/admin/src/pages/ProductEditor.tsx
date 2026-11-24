@@ -5,7 +5,7 @@ import { ApiError, errorMessage, formatDate, formatMoney, type ProductStatus } f
 import { api, soles, STORE_URL } from "../lib/api";
 import { useToast } from "../components/Toast";
 import { ProductPill } from "../components/Pill";
-import { ModelPreview } from "../components/ModelPreview";
+import { ModelPreview, type LoadedModel } from "../components/ModelPreview";
 import { dominantColor } from "../lib/color";
 
 const DEFAULT_ACCENT = "#ff2a2a";
@@ -315,7 +315,7 @@ export function ProductEditorPage() {
                       </button>
                     )}
                   </div>,
-                  "Tiñe el fondo, la luz y el brillo del visor 3D. Guarda para aplicarlo.",
+                  "Tiñe el fondo, la luz y el brillo del visor 3D. Guarda para aplicarlo. Con modelo 3D, también puedes tomarlo del modelo (más abajo).",
                 )}
                 <label className="switch" style={{ alignSelf: "end", height: 40 }}>
                   <input type="checkbox" checked={form.featured} onChange={(e) => set("featured", e.target.checked)} />
@@ -833,6 +833,22 @@ function ModelCard({ product, onSaved }: { product: Product; onSaved: (p: Produc
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const loaded = useRef<LoadedModel | null>(null);
+  // Tras subir un modelo, la escena 3D toma su color en cuanto se ve
+  const colorOnLoad = useRef(false);
+
+  async function colorFromModel(model: LoadedModel | null, auto: boolean) {
+    if (!model) return;
+    try {
+      // Se espera un instante a que el modelo se haya dibujado
+      await new Promise((r) => setTimeout(r, 400));
+      const accentColor = await dominantColor(model.toDataURL("image/png"));
+      onSaved(await api.patch<Product>(`/api/admin/products/${product.id}`, { accentColor }));
+      toast(auto ? "La escena 3D tomó el color del modelo" : "Color de la escena 3D tomado del modelo");
+    } catch {
+      if (!auto) toast("No se pudo leer el color del modelo", "error");
+    }
+  }
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -840,6 +856,7 @@ function ModelCard({ product, onSaved }: { product: Product; onSaved: (p: Produc
     fd.append("model", file);
     setUploading(true);
     try {
+      colorOnLoad.current = true;
       onSaved(await api.post<Product>(`/api/admin/products/${product.id}/model`, fd));
       toast("Modelo 3D asociado al producto");
     } catch (err) {
@@ -873,7 +890,20 @@ function ModelCard({ product, onSaved }: { product: Product; onSaved: (p: Produc
       <div className="card__body form-grid">
         {product.modelUrl ? (
           <>
-            <ModelPreview key={product.modelUrl} src={product.modelUrl} />
+            <ModelPreview
+              key={product.modelUrl}
+              src={product.modelUrl}
+              onLoad={(model) => {
+                loaded.current = model;
+                if (colorOnLoad.current) {
+                  colorOnLoad.current = false;
+                  void colorFromModel(model, true);
+                }
+              }}
+            />
+            <button type="button" className="btn btn--sm" style={{ justifySelf: "start" }} onClick={() => colorFromModel(loaded.current, false)}>
+              Tomar el color del modelo 3D para la escena
+            </button>
             <span className="muted">
               Archivo: <span className="mono">{product.modelFileName}</span> — gira con el mouse, acerca con la rueda.
             </span>
