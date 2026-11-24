@@ -74,6 +74,13 @@ La tienda funciona igual con la base **MySQL de XAMPP** que con PostgreSQL (Rend
 2. Doble clic en **`instalar.bat`** y elige **1 (XAMPP)**. Pulsa Enter en usuario, contraseña, host, puerto y nombre de la base (`sole20`). Crea la base sola.
 3. Doble clic en **`iniciar.bat`**. En phpMyAdmin (http://localhost/phpmyadmin) verás la base `sole20` con sus tablas.
 
+**Verla en http://localhost (como tus otros proyectos de XAMPP)**
+1. Una sola vez: doble clic en **`poner-en-xampp.bat`**. Copia la carpeta `sole20` a `C:\xampp\htdocs` (si XAMPP está en otra ruta, te la pide). Ya aparece **`sole20/`** en http://localhost.
+2. Cada vez que quieras usar la tienda: MySQL en **Start** en XAMPP y doble clic en **`iniciar-xampp.bat`**. Deja esa ventana abierta.
+3. Entra en **http://localhost/sole20/**. Dice si la tienda está encendida y tiene los botones **Abrir la tienda** y **Panel de administración**. La tienda queda en `http://localhost:4000` y el panel en `http://localhost:4000/admin`.
+
+> En `htdocs` solo va esa página de entrada, **nunca la carpeta del proyecto**: Apache dejaría a la vista de cualquiera en tu red el archivo `server/.env`, con tus contraseñas y secretos.
+
 **Traer tus datos de Render (sin perder nada)**
 1. En tu panel de Render (`…onrender.com/admin`) → **Mi cuenta → Descargar copia de seguridad**. Descarga un archivo `sole20-copia-….jsonl.gz` con **todo**: productos, precios, stock, clientes y sus contraseñas, pedidos, boletas y numeración, fotos y modelos 3D.
 2. En tu PC (con MySQL iniciado en XAMPP), doble clic en **`importar-copia.bat`**, arrastra el archivo a la ventana, pulsa Enter y escribe `SI`. Sustituye los datos de esa instalación por los de la copia.
